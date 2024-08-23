@@ -17,6 +17,8 @@ class AlexRobot : public rclcpp::Node{
 
   AlexRobot() : Node("alex_robot"){
 
+    start_time = std::chrono::steady_clock::now();
+
     // Publisher for joint_states
     alex_pub = this->create_publisher<sensor_msgs::msg::JointState>( "joint_command", 10);
 
@@ -71,7 +73,6 @@ class AlexRobot : public rclcpp::Node{
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-    step = 20;
     frequency = 0.5;
     amplitude = 2;
   }
@@ -84,7 +85,7 @@ class AlexRobot : public rclcpp::Node{
     // Process the received joint state message (msg)
     // You can update the vectors or process the data as needed
 
-    for (int i = 0; i < left_arm_cur_pos_vec.size(); i++){
+    for (int i = 0; i < int(left_arm_cur_pos_vec.size()); i++){
 
       left_arm_cur_pos_vec[i] = msg->position[2 * i];
       left_arm_cur_vel_vec[i] = msg->position[2 * i];
@@ -93,7 +94,7 @@ class AlexRobot : public rclcpp::Node{
       right_arm_cur_vel_vec[i] = msg->position[2 * i + 1];
     }
 
-    for (int i = 0; i < left_hand_cur_pos_vec.size()/2; i++){
+    for (int i = 0; i < int(left_hand_cur_pos_vec.size()/2); i++){
       left_hand_cur_pos_vec[i]     = msg->position[i + 14];
       left_hand_cur_pos_vec[i + 5] = msg->position[i + 24];
       left_hand_cur_vel_vec[i]     = msg->position[i + 14];
@@ -115,7 +116,11 @@ class AlexRobot : public rclcpp::Node{
 
   void jointCallback(){
 
-    for (int i = 0; i < left_arm_des_pos_vec.size(); i++){
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed = now - start_time;
+    time = elapsed.count(); // time in seconds
+
+    for (int i = 0; i < int(left_arm_des_pos_vec.size()); i++){
 
       joint_message.position[2 * i] = left_arm_des_pos_vec[i];
       joint_message.velocity[2 * i] = left_arm_des_vel_vec[i];
@@ -124,7 +129,7 @@ class AlexRobot : public rclcpp::Node{
       joint_message.velocity[2 * i + 1] = right_arm_des_vel_vec[i];
     }
 
-    for (int i = 0; i < left_hand_des_pos_vec.size()/2; i++){
+    for (int i = 0; i < int(left_hand_des_pos_vec.size()/2); i++){
       joint_message.position[i + 14] =  left_hand_des_pos_vec[i];
       joint_message.position[i + 24] =  left_hand_des_pos_vec[i + 5];
       joint_message.velocity[i + 14] =  left_hand_des_vel_vec[i];
@@ -137,10 +142,6 @@ class AlexRobot : public rclcpp::Node{
     }
 
     // RCLCPP_INFO(this->get_logger(), "Callback function running");
-
-    auto now = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed = now - start_time;
-    time = elapsed.count(); // time in seconds
     
     target_position = sin(amplitude * M_PI * frequency * time);
     target_velocity = amplitude * M_PI * cos(2 * M_PI * frequency * time);
@@ -166,12 +167,14 @@ class AlexRobot : public rclcpp::Node{
     // }
 
     alex_pub->publish(joint_message);
-    
+
+    std::cout << "Time: " << time << std::endl;
+
   }
 
   private:
 
-  double frequency, time, amplitude, step, target_position, target_velocity;
+  double frequency, time, amplitude, target_position, target_velocity;
 
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr alex_pub;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr alex_sub;
