@@ -86,6 +86,14 @@ class AlexRobot : public rclcpp::Node{
 
     right_hand_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+    // left_arm - end-effector - desired and current
+    left_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    left_arm_cur_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    // right_arm - end-effector - desired and current
+    right_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    right_arm_cur_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
     // joint-message - Position
     joint_message.position = {0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 
                               0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180,
@@ -274,81 +282,110 @@ class AlexRobot : public rclcpp::Node{
   }
 
     // Function to compute Jacobian matrices for both arms
-    void computeJacobian() {
-        KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
-        KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
+  void computeJacobian() {
 
-        for (int i = 0; i < int(left_arm_joint_positions.rows()); ++i) {
-            left_arm_joint_positions(i) = left_arm_cur_pos_vec[i];
-            right_arm_joint_positions(i) = right_arm_cur_pos_vec[i];
-        }
+    KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
+    KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
 
-        KDL::Jacobian left_arm_jacobian(left_arm_chain.getNrOfJoints());
-        KDL::Jacobian right_arm_jacobian(right_arm_chain.getNrOfJoints());
+    for (int i = 0; i < int(left_arm_joint_positions.rows()); ++i) {
+        left_arm_joint_positions(i) = left_arm_cur_pos_vec[i];
+        right_arm_joint_positions(i) = right_arm_cur_pos_vec[i];
+    }
 
-        left_arm_jacobian_solver->JntToJac(left_arm_joint_positions, left_arm_jacobian);
-        right_arm_jacobian_solver->JntToJac(right_arm_joint_positions, right_arm_jacobian);
+    KDL::Jacobian left_arm_jacobian(left_arm_chain.getNrOfJoints());
+    KDL::Jacobian right_arm_jacobian(right_arm_chain.getNrOfJoints());
 
-        std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian.data << std::endl;
-        std::cout << "Right Arm Jacobian: \n" << right_arm_jacobian.data << std::endl;
+    left_arm_jacobian_solver->JntToJac(left_arm_joint_positions, left_arm_jacobian);
+    right_arm_jacobian_solver->JntToJac(right_arm_joint_positions, right_arm_jacobian);
+
+    std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian.data << std::endl;
+    std::cout << "Right Arm Jacobian: \n" << right_arm_jacobian.data << std::endl;
 
     }
 
     // Function to compute forward kinematics for both arms
-    void computeForwardKinematics() {
-        KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
-        KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
+  void computeForwardKinematics() {
 
-        // Fill in the joint positions for left and right arms
-        for (int i = 0; i < int(left_arm_joint_positions.rows()); ++i) {
-            left_arm_joint_positions(i) = left_arm_cur_pos_vec[i];
-            right_arm_joint_positions(i) = right_arm_cur_pos_vec[i];
-        }
+    KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
+    KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
 
-        // Define frames for the end-effector positions
-        KDL::Frame left_arm_ee_frame;
-        KDL::Frame right_arm_ee_frame;
+    // Fill in the joint positions for left and right arms
+    for (int i = 0; i < int(left_arm_joint_positions.rows()); ++i) {
 
-        // Compute forward kinematics for left and right arms
-        if (left_arm_fk_solver->JntToCart(left_arm_joint_positions, left_arm_ee_frame) >= 0) {
-            std::cout << std::endl << "Left Arm End-Effector Position: "
-                      << "X: " << left_arm_ee_frame.p.x() << ", "
-                      << "Y: " << left_arm_ee_frame.p.y() << ", "
-                      << "Z: " << left_arm_ee_frame.p.z() << std::endl;
+        left_arm_joint_positions(i) = left_arm_cur_pos_vec[i];
+        right_arm_joint_positions(i) = right_arm_cur_pos_vec[i];
+    }
+    // Define frames for the end-effector positions
+    KDL::Frame left_arm_ee_frame;
+    KDL::Frame right_arm_ee_frame;
 
-            // Extract orientation as Euler angles (roll, pitch, yaw)
-            double roll, pitch, yaw;
-            left_arm_ee_frame.M.GetRPY(roll, pitch, yaw);
-            std::cout << "Left Arm End-Effector Orientation (RPY): "
-                      << "Roll: " << roll << ", "
-                      << "Pitch: " << pitch << ", "
-                      << "Yaw: " << yaw << std::endl;
-        } else {
-            RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for left arm.");
-        }
+    // Compute forward kinematics for left and right arms
+    if (left_arm_fk_solver->JntToCart(left_arm_joint_positions, left_arm_ee_frame) >= 0) {
 
-        if (right_arm_fk_solver->JntToCart(right_arm_joint_positions, right_arm_ee_frame) >= 0) {
-            std::cout << std::endl << "Right Arm End-Effector Position: "
-                      << "X: " << right_arm_ee_frame.p.x() << ", "
-                      << "Y: " << right_arm_ee_frame.p.y() << ", "
-                      << "Z: " << right_arm_ee_frame.p.z() << std::endl;
+        // std::cout << std::endl << "Left Arm End-Effector Position: "
+        //           << "X: " << left_arm_ee_frame.p.x() << ", "
+        //           << "Y: " << left_arm_ee_frame.p.y() << ", "
+        //           << "Z: " << left_arm_ee_frame.p.z() << std::endl;
 
-            // Extract orientation as Euler angles (roll, pitch, yaw)
-            double roll, pitch, yaw;
-            right_arm_ee_frame.M.GetRPY(roll, pitch, yaw);
-            std::cout << "Right Arm End-Effector Orientation (RPY): "
-                      << "Roll: " << roll << ", "
-                      << "Pitch: " << pitch << ", "
-                      << "Yaw: " << yaw << std::endl;
-        } else {
-            RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for right arm.");
-        }
+        // Extract orientation as Euler angles (roll, pitch, yaw)
+        left_arm_ee_frame.M.GetRPY(left_arm_roll, left_arm_pitch, left_arm_yaw);
+        // std::cout << "Left Arm End-Effector Orientation (RPY): "
+        //           << "Roll: " << left_arm_roll << ", "
+        //           << "Pitch: " << left_arm_pitch << ", "
+        //           << "Yaw: " << left_arm_yaw << std::endl;
+    } else {
+
+        RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for left arm.");
+    }
+    if (right_arm_fk_solver->JntToCart(right_arm_joint_positions, right_arm_ee_frame) >= 0) {
+
+        // std::cout << std::endl << "Right Arm End-Effector Position: "
+        //           << "X: " << right_arm_ee_frame.p.x() << ", "
+        //           << "Y: " << right_arm_ee_frame.p.y() << ", "
+        //           << "Z: " << right_arm_ee_frame.p.z() << std::endl;
+
+        // Extract orientation as Euler angles (roll, pitch, yaw)
+        right_arm_ee_frame.M.GetRPY(right_arm_roll, right_arm_pitch, right_arm_yaw);
+        // std::cout << "Right Arm End-Effector Orientation (RPY): "
+        //           << "Roll: " << right_arm_roll << ", "
+        //           << "Pitch: " << right_arm_pitch << ", "
+        //           << "Yaw: " << right_arm_yaw << std::endl;
+    } else {
+
+        RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for right arm.");
+    }
+
+    left_arm_cur_end_eff_pose_vec[0] = left_arm_ee_frame.p.x();
+    left_arm_cur_end_eff_pose_vec[1] = left_arm_ee_frame.p.y();
+    left_arm_cur_end_eff_pose_vec[2] = left_arm_ee_frame.p.z();
+
+    left_arm_cur_end_eff_pose_vec[3] =  left_arm_roll;
+    left_arm_cur_end_eff_pose_vec[4] =  left_arm_pitch;
+    left_arm_cur_end_eff_pose_vec[5] =  left_arm_yaw;
+
+    right_arm_cur_end_eff_pose_vec[0] = right_arm_ee_frame.p.x();
+    right_arm_cur_end_eff_pose_vec[1] = right_arm_ee_frame.p.y();
+    right_arm_cur_end_eff_pose_vec[2] = right_arm_ee_frame.p.z();
+
+    right_arm_cur_end_eff_pose_vec[3] =  right_arm_roll;
+    right_arm_cur_end_eff_pose_vec[4] =  right_arm_pitch;
+    right_arm_cur_end_eff_pose_vec[5] =  right_arm_yaw;
+
+    std::cout << std::endl << "Left Arm End-Effector Pose: " << "\tP.x = " << left_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << left_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << left_arm_cur_end_eff_pose_vec[2] 
+                                                             << "\tO.x = " << left_arm_cur_end_eff_pose_vec[3] << "\tO.y = " << left_arm_cur_end_eff_pose_vec[4] << "\tO.z = " << left_arm_cur_end_eff_pose_vec[5] << std::endl;
+
+    std::cout << "Right Arm End-Effector Pose: " << "\tP.x = " << right_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << right_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << right_arm_cur_end_eff_pose_vec[2] 
+                                                 << "\tO.x = " << right_arm_cur_end_eff_pose_vec[3] << "\tO.y = " << right_arm_cur_end_eff_pose_vec[4] << "\tO.z = " << right_arm_cur_end_eff_pose_vec[5] << std::endl;
+
     }
 
   private:
 
   double kp_arm, kd_arm, kp_hand, kd_hand; 
   double frequency, time, amplitude, target_position, target_velocity;
+
+  double left_arm_roll, left_arm_pitch, left_arm_yaw;
+  double right_arm_roll, right_arm_pitch, right_arm_yaw;
 
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr alex_pub;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr alex_sub;
@@ -377,6 +414,12 @@ class AlexRobot : public rclcpp::Node{
   std::vector<double> right_hand_des_vel_vec;
   std::vector<double> right_hand_cur_pos_vec;
   std::vector<double> right_hand_cur_vel_vec;
+
+  std::vector<double> left_arm_des_end_eff_pose_vec;
+  std::vector<double> right_arm_des_end_eff_pose_vec;
+
+  std::vector<double> left_arm_cur_end_eff_pose_vec;
+  std::vector<double> right_arm_cur_end_eff_pose_vec;
 
   std::vector<double> left_arm_des_trq_vec;
   std::vector<double> right_arm_des_trq_vec;
