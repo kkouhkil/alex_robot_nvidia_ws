@@ -86,21 +86,25 @@ class AlexRobot : public rclcpp::Node{
 
     right_hand_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+    // joint-message - Position
     joint_message.position = {0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 
                               0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180,
                               0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180,
                               0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180};
 
+    // joint-message - Velocity
     joint_message.velocity = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+    // joint-message - Effort
     joint_message.effort = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+    // controller PD gains
     kp_arm = 25;
     kd_arm = 2.5;
 
@@ -111,37 +115,37 @@ class AlexRobot : public rclcpp::Node{
     amplitude = 1.0;
   }
 
-    // URDF parsing and kinematics setup
-    void initializeKinematics() {
-        urdf::Model robot_model;
-        if (!robot_model.initFile("/home/keyhan/git/alex_robot_models/alex_description/urdf/20240516_Alex_TestStand_FixedHead_PsyonicHands.urdf")) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to load URDF file");
-            return;
-        }
+  // URDF parsing and kinematics setup
+  void initializeKinematics() {
 
-        KDL::Tree robot_tree;
-        if (!kdl_parser::treeFromUrdfModel(robot_model, robot_tree)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to convert URDF to KDL tree");
-            return;
-        }
+      urdf::Model robot_model;
+      if (!robot_model.initFile("/home/keyhan/git/alex_robot_models/alex_description/urdf/20240516_Alex_TestStand_FixedHead_PsyonicHands.urdf")) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to load URDF file");
+          return;
+      }
 
-        if (!robot_tree.getChain("base_link", "LeftGripperYawLink", left_arm_chain)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to get left arm chain");
-        }
+      KDL::Tree robot_tree;
+      if (!kdl_parser::treeFromUrdfModel(robot_model, robot_tree)) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to convert URDF to KDL tree");
+          return;
+      }
 
-        if (!robot_tree.getChain("base_link", "RightGripperYawLink", right_arm_chain)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to get right arm chain");
-        }
+      if (!robot_tree.getChain("base_link", "LeftGripperYawLink", left_arm_chain)) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to get left arm chain");
+      }
 
-        left_arm_jacobian_solver = std::make_shared<KDL::ChainJntToJacSolver>(left_arm_chain);
-        right_arm_jacobian_solver = std::make_shared<KDL::ChainJntToJacSolver>(right_arm_chain);
+      if (!robot_tree.getChain("base_link", "RightGripperYawLink", right_arm_chain)) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to get right arm chain");
+      }
 
-        // Initialize forward kinematics solvers
-        left_arm_fk_solver = std::make_shared<KDL::ChainFkSolverPos_recursive>(left_arm_chain);
-        right_arm_fk_solver = std::make_shared<KDL::ChainFkSolverPos_recursive>(right_arm_chain);
+      left_arm_jacobian_solver = std::make_shared<KDL::ChainJntToJacSolver>(left_arm_chain);
+      right_arm_jacobian_solver = std::make_shared<KDL::ChainJntToJacSolver>(right_arm_chain);
 
-        RCLCPP_INFO(this->get_logger(), "Kinematics initialized successfully");
-    }
+      // Initialize forward kinematics solvers
+      left_arm_fk_solver = std::make_shared<KDL::ChainFkSolverPos_recursive>(left_arm_chain);
+      right_arm_fk_solver = std::make_shared<KDL::ChainFkSolverPos_recursive>(right_arm_chain);
+      RCLCPP_INFO(this->get_logger(), "Kinematics initialized successfully");
+  }
 
   // Subscriber callback
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg){
@@ -177,6 +181,7 @@ class AlexRobot : public rclcpp::Node{
 
   }
 
+  // Publisher callback
   void jointCallback(){
 
     auto now = std::chrono::steady_clock::now();
@@ -255,6 +260,7 @@ class AlexRobot : public rclcpp::Node{
     // Compute forward kinematics for left and right arms
     computeForwardKinematics();
 
+    // Publishing joint messages
     alex_pub->publish(joint_message);
 
     std::cout << std::endl << "Time: " << time << std::endl << std::endl;
