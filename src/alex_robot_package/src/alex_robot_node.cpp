@@ -12,6 +12,14 @@ using namespace std;
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 
+// KDL and URDF headers
+#include <urdf/model.h>
+#include <kdl_parser/kdl_parser.hpp>
+#include <kdl/chain.hpp>
+#include <kdl/chainjnttojacdotsolver.hpp>
+#include <kdl/jntarray.hpp>
+#include <kdl/jacobian.hpp>
+
 class AlexRobot : public rclcpp::Node{
 
   public:
@@ -38,7 +46,10 @@ class AlexRobot : public rclcpp::Node{
                           "Right_index_q1", "Right_middle_q1", "Right_pinky_q1", "Right_ring_q1", "Right_thumb_q1",
                           "Left_index_q2", "Left_middle_q2", "Left_pinky_q2", "Left_ring_q2", "Left_thumb_q2",
                           "Right_index_q2", "Right_middle_q2", "Right_pinky_q2", "Right_ring_q2", "Right_thumb_q2"
-};
+    };
+
+    // Initialize URDF and KDL chain
+    initializeKinematics();
 
     // left_arm  =  joint_message.position[0, 2, 4, 6, 8, 10, 12]
     left_arm_des_pos_vec  = {-30 * M_PI/180, 75 * M_PI/180, 0.0, -60 * M_PI/180, 45 * M_PI/180, 0.0, 0.0};
@@ -93,18 +104,43 @@ class AlexRobot : public rclcpp::Node{
     kp_hand = 0.125;
     kd_hand = 0.0125;
 
-    frequency = 0.25;
-    amplitude = 2.5;
+    frequency = 0.1;
+    amplitude = 1.0;
   }
+
+// URDF parsing and kinematics setup
+    void initializeKinematics() {
+        urdf::Model robot_model;
+        if (!robot_model.initFile("/home/keyhan/git/alex_robot_models/alex_description/urdf/20240516_Alex_TestStand_FixedHead_PsyonicHands.urdf")) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to load URDF file");
+            return;
+        }
+
+        KDL::Tree robot_tree;
+        if (!kdl_parser::treeFromUrdfModel(robot_model, robot_tree)) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to convert URDF to KDL tree");
+            return;
+        }
+
+        if (!robot_tree.getChain("base_link", "LeftGripperYawLink", left_arm_chain)) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to get left arm chain");
+        }
+
+        if (!robot_tree.getChain("base_link", "RightGripperYawLink", right_arm_chain)) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to get right arm chain");
+        }
+
+        left_arm_jacobian_solver = std::make_shared<KDL::ChainJntToJacSolver>(left_arm_chain);
+        right_arm_jacobian_solver = std::make_shared<KDL::ChainJntToJacSolver>(right_arm_chain);
+
+        RCLCPP_INFO(this->get_logger(), "Kinematics initialized successfully");
+    }
 
   // Subscriber callback
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg){
 
     // RCLCPP_INFO(this->get_logger(), "Received joint state update");
     
-    // Process the received joint state message (msg)
-    // You can update the vectors or process the data as needed
-
     for (int i = 0; i < int(left_arm_cur_pos_vec.size()); i++){
 
       left_arm_cur_pos_vec[i] = msg->position[2 * i];
@@ -126,15 +162,7 @@ class AlexRobot : public rclcpp::Node{
       right_hand_cur_vel_vec[i + 5] = msg->position[i + 29];
     }
 
-    // for (int i = 0; i < int(left_arm_cur_pos_vec.size()); i++){
-    //   std::cout << "left_arm_cur_pos_vec[" << i <<"] = " << left_arm_cur_pos_vec[i] << std::endl;
-    // }
-
-    // for (int i = 0; i < int(left_arm_cur_pos_vec.size()); i++){
-    //   std::cout << "right_arm_cur_pos_vec[" << i <<"] = " << right_arm_cur_pos_vec[i] << std::endl;
-    // }
-
-    // For demonstration, let's just print out the first joint name and position
+    // print out the first joint name and position
     // if (!msg->name.empty() && !msg->position.empty()) {
     //   RCLCPP_INFO(this->get_logger(), "First joint: %s, Position: %f", 
     //               msg->name[0].c_str(), msg->position[0]);
@@ -186,11 +214,11 @@ class AlexRobot : public rclcpp::Node{
     target_position = sin(amplitude * M_PI * frequency * time);
     target_velocity = amplitude * M_PI * cos(2 * M_PI * frequency * time);
 
-    // target_position = 45 * (M_PI / 180);
-    // target_velocity = 0;
+    left_arm_des_pos_vec[0] = target_position;
+    right_arm_des_pos_vec[0] = target_position;
 
-    // left_arm_des_pos_vec[0] = target_position;
-    // left_arm_des_vel_vec[0] = target_velocity;
+    left_arm_des_vel_vec[0] = target_velocity;
+    right_arm_des_vel_vec[0] = target_velocity;
 
     for (int i = 0; i < int(left_arm_des_trq_vec.size()); i++){
 
@@ -214,6 +242,9 @@ class AlexRobot : public rclcpp::Node{
     //   pos = target_velocity;
     // }
 
+    // Compute Jacobian for left and right arms
+    computeJacobian();
+
     alex_pub->publish(joint_message);
 
     std::cout << "Time: " << time << std::endl;
@@ -225,6 +256,26 @@ class AlexRobot : public rclcpp::Node{
     // std::cout << left_hand_des_pos_vec[0] << " --- " << left_hand_cur_pos_vec[0] << " --- " << left_hand_des_pos_vec[0] - left_hand_cur_pos_vec[0] << std::endl;
 
   }
+
+      // Function to compute Jacobian matrices for both arms
+    void computeJacobian() {
+        KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
+        KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
+
+        for (int i = 0; i < int(left_arm_joint_positions.rows()); ++i) {
+            left_arm_joint_positions(i) = left_arm_cur_pos_vec[i];
+            right_arm_joint_positions(i) = right_arm_cur_pos_vec[i];
+        }
+
+        KDL::Jacobian left_arm_jacobian(left_arm_chain.getNrOfJoints());
+        KDL::Jacobian right_arm_jacobian(right_arm_chain.getNrOfJoints());
+
+        left_arm_jacobian_solver->JntToJac(left_arm_joint_positions, left_arm_jacobian);
+        right_arm_jacobian_solver->JntToJac(right_arm_joint_positions, right_arm_jacobian);
+
+        std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian.data << std::endl;
+        std::cout << "Right Arm Jacobian: \n" << right_arm_jacobian.data << std::endl;
+    }
 
   private:
 
@@ -263,6 +314,14 @@ class AlexRobot : public rclcpp::Node{
   std::vector<double> right_arm_des_trq_vec;
   std::vector<double> left_hand_des_trq_vec;
   std::vector<double> right_hand_des_trq_vec;
+
+  // KDL chains for left and right arms
+  KDL::Chain left_arm_chain;
+  KDL::Chain right_arm_chain;
+
+  // Jacobian solvers
+  std::shared_ptr<KDL::ChainJntToJacSolver> left_arm_jacobian_solver;
+  std::shared_ptr<KDL::ChainJntToJacSolver> right_arm_jacobian_solver;
 
 };
 
