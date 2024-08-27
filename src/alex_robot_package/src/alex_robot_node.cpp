@@ -20,6 +20,9 @@ using namespace std;
 #include <kdl/jntarray.hpp>
 #include <kdl/jacobian.hpp>
 
+// For end-effector pose
+#include <kdl/frames.hpp> 
+
 class AlexRobot : public rclcpp::Node{
 
   public:
@@ -108,7 +111,7 @@ class AlexRobot : public rclcpp::Node{
     amplitude = 1.0;
   }
 
-// URDF parsing and kinematics setup
+    // URDF parsing and kinematics setup
     void initializeKinematics() {
         urdf::Model robot_model;
         if (!robot_model.initFile("/home/keyhan/git/alex_robot_models/alex_description/urdf/20240516_Alex_TestStand_FixedHead_PsyonicHands.urdf")) {
@@ -132,6 +135,10 @@ class AlexRobot : public rclcpp::Node{
 
         left_arm_jacobian_solver = std::make_shared<KDL::ChainJntToJacSolver>(left_arm_chain);
         right_arm_jacobian_solver = std::make_shared<KDL::ChainJntToJacSolver>(right_arm_chain);
+
+        // Initialize forward kinematics solvers
+        left_arm_fk_solver = std::make_shared<KDL::ChainFkSolverPos_recursive>(left_arm_chain);
+        right_arm_fk_solver = std::make_shared<KDL::ChainFkSolverPos_recursive>(right_arm_chain);
 
         RCLCPP_INFO(this->get_logger(), "Kinematics initialized successfully");
     }
@@ -214,11 +221,11 @@ class AlexRobot : public rclcpp::Node{
     target_position = sin(amplitude * M_PI * frequency * time);
     target_velocity = amplitude * M_PI * cos(2 * M_PI * frequency * time);
 
-    left_arm_des_pos_vec[0] = target_position;
-    right_arm_des_pos_vec[0] = target_position;
+    // left_arm_des_pos_vec[0] = target_position;
+    // right_arm_des_pos_vec[0] = target_position;
 
-    left_arm_des_vel_vec[0] = target_velocity;
-    right_arm_des_vel_vec[0] = target_velocity;
+    // left_arm_des_vel_vec[0] = target_velocity;
+    // right_arm_des_vel_vec[0] = target_velocity;
 
     for (int i = 0; i < int(left_arm_des_trq_vec.size()); i++){
 
@@ -245,9 +252,12 @@ class AlexRobot : public rclcpp::Node{
     // Compute Jacobian for left and right arms
     computeJacobian();
 
+    // Compute forward kinematics for left and right arms
+    computeForwardKinematics();
+
     alex_pub->publish(joint_message);
 
-    std::cout << "Time: " << time << std::endl;
+    std::cout << std::endl << "Time: " << time << std::endl << std::endl;
 
     // std::cout << "left_arm_des_trq_vec[3] =  " << left_arm_des_trq_vec[1] << std::endl;
     // std::cout << left_arm_des_pos_vec[1] << " --- " << left_arm_cur_pos_vec[1] << " --- " << left_arm_des_pos_vec[1] - left_arm_cur_pos_vec[1] << std::endl;
@@ -257,7 +267,7 @@ class AlexRobot : public rclcpp::Node{
 
   }
 
-      // Function to compute Jacobian matrices for both arms
+    // Function to compute Jacobian matrices for both arms
     void computeJacobian() {
         KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
         KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
@@ -275,6 +285,58 @@ class AlexRobot : public rclcpp::Node{
 
         std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian.data << std::endl;
         std::cout << "Right Arm Jacobian: \n" << right_arm_jacobian.data << std::endl;
+
+    }
+
+    // Function to compute forward kinematics for both arms
+    void computeForwardKinematics() {
+        KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
+        KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
+
+        // Fill in the joint positions for left and right arms
+        for (int i = 0; i < int(left_arm_joint_positions.rows()); ++i) {
+            left_arm_joint_positions(i) = left_arm_cur_pos_vec[i];
+            right_arm_joint_positions(i) = right_arm_cur_pos_vec[i];
+        }
+
+        // Define frames for the end-effector positions
+        KDL::Frame left_arm_ee_frame;
+        KDL::Frame right_arm_ee_frame;
+
+        // Compute forward kinematics for left and right arms
+        if (left_arm_fk_solver->JntToCart(left_arm_joint_positions, left_arm_ee_frame) >= 0) {
+            std::cout << std::endl << "Left Arm End-Effector Position: "
+                      << "X: " << left_arm_ee_frame.p.x() << ", "
+                      << "Y: " << left_arm_ee_frame.p.y() << ", "
+                      << "Z: " << left_arm_ee_frame.p.z() << std::endl;
+
+            // Extract orientation as Euler angles (roll, pitch, yaw)
+            double roll, pitch, yaw;
+            left_arm_ee_frame.M.GetRPY(roll, pitch, yaw);
+            std::cout << "Left Arm End-Effector Orientation (RPY): "
+                      << "Roll: " << roll << ", "
+                      << "Pitch: " << pitch << ", "
+                      << "Yaw: " << yaw << std::endl;
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for left arm.");
+        }
+
+        if (right_arm_fk_solver->JntToCart(right_arm_joint_positions, right_arm_ee_frame) >= 0) {
+            std::cout << std::endl << "Right Arm End-Effector Position: "
+                      << "X: " << right_arm_ee_frame.p.x() << ", "
+                      << "Y: " << right_arm_ee_frame.p.y() << ", "
+                      << "Z: " << right_arm_ee_frame.p.z() << std::endl;
+
+            // Extract orientation as Euler angles (roll, pitch, yaw)
+            double roll, pitch, yaw;
+            right_arm_ee_frame.M.GetRPY(roll, pitch, yaw);
+            std::cout << "Right Arm End-Effector Orientation (RPY): "
+                      << "Roll: " << roll << ", "
+                      << "Pitch: " << pitch << ", "
+                      << "Yaw: " << yaw << std::endl;
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for right arm.");
+        }
     }
 
   private:
@@ -323,6 +385,10 @@ class AlexRobot : public rclcpp::Node{
   std::shared_ptr<KDL::ChainJntToJacSolver> left_arm_jacobian_solver;
   std::shared_ptr<KDL::ChainJntToJacSolver> right_arm_jacobian_solver;
 
+  // Forward kinematics solvers
+  std::shared_ptr<KDL::ChainFkSolverPos_recursive> left_arm_fk_solver;
+  std::shared_ptr<KDL::ChainFkSolverPos_recursive> right_arm_fk_solver;
+
 };
 
 int main(int argc, char ** argv)
@@ -335,4 +401,3 @@ int main(int argc, char ** argv)
   printf("alex_robot_package package executed sucessfully\n");
   return 0;
 }
-
