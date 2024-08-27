@@ -5,6 +5,7 @@
 
 #include <ctime>
 #include <chrono>
+#include <cmath>
 
 using namespace std;
 
@@ -40,16 +41,20 @@ class AlexRobot : public rclcpp::Node{
 };
 
     // left_arm  =  joint_message.position[0, 2, 4, 6, 8, 10, 12]
-    left_arm_des_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    left_arm_des_pos_vec  = {-30 * M_PI/180, 75 * M_PI/180, 0.0, -60 * M_PI/180, 45 * M_PI/180, 0.0, 0.0};
     left_arm_des_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     left_arm_cur_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     left_arm_cur_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+    left_arm_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
     // right_arm =  joint_message.position[1, 3, 5, 7, 9, 11, 13]
-    right_arm_des_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};   
+    right_arm_des_pos_vec  = {-30 * M_PI/180, -75 * M_PI/180, 0.0, -60 * M_PI/180, -45 * M_PI/180, 0.0, 0.0};   
     right_arm_des_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     right_arm_cur_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};   
     right_arm_cur_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    right_arm_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     // left_hand  = joint_message.position[14, 15, 16, 17, 18, 24, 25, 26, 27, 28]
     left_hand_des_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -57,11 +62,15 @@ class AlexRobot : public rclcpp::Node{
     left_hand_cur_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     left_hand_cur_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+    left_hand_des_trq_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
     // right_hand = joint_message.position[19, 20, 21, 22, 23, 29, 30, 31, 32, 33]
     right_hand_des_pos_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
     right_hand_des_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
     right_hand_cur_pos_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
     right_hand_cur_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
+
+    right_hand_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     joint_message.position = {0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 
                               0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180,
@@ -73,8 +82,19 @@ class AlexRobot : public rclcpp::Node{
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-    frequency = 0.5;
-    amplitude = 2;
+    joint_message.effort = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    kp_arm = 25;
+    kd_arm = 2.5;
+
+    kp_hand = 0.125;
+    kd_hand = 0.0125;
+
+    frequency = 0.25;
+    amplitude = 2.5;
   }
 
   // Subscriber callback
@@ -106,10 +126,18 @@ class AlexRobot : public rclcpp::Node{
       right_hand_cur_vel_vec[i + 5] = msg->position[i + 29];
     }
 
+    // for (int i = 0; i < int(left_arm_cur_pos_vec.size()); i++){
+    //   std::cout << "left_arm_cur_pos_vec[" << i <<"] = " << left_arm_cur_pos_vec[i] << std::endl;
+    // }
+
+    // for (int i = 0; i < int(left_arm_cur_pos_vec.size()); i++){
+    //   std::cout << "right_arm_cur_pos_vec[" << i <<"] = " << right_arm_cur_pos_vec[i] << std::endl;
+    // }
+
     // For demonstration, let's just print out the first joint name and position
     // if (!msg->name.empty() && !msg->position.empty()) {
-      // RCLCPP_INFO(this->get_logger(), "First joint: %s, Position: %f", 
-      //             msg->name[0].c_str(), msg->position[0]);
+    //   RCLCPP_INFO(this->get_logger(), "First joint: %s, Position: %f", 
+    //               msg->name[0].c_str(), msg->position[0]);
     // }
 
   }
@@ -125,20 +153,32 @@ class AlexRobot : public rclcpp::Node{
       joint_message.position[2 * i] = left_arm_des_pos_vec[i];
       joint_message.velocity[2 * i] = left_arm_des_vel_vec[i];
 
+      joint_message.effort[2 * i] = left_arm_des_trq_vec[i];
+
       joint_message.position[2 * i + 1] = right_arm_des_pos_vec[i];
       joint_message.velocity[2 * i + 1] = right_arm_des_vel_vec[i];
+
+      joint_message.effort[2 * i + 1] = right_arm_des_trq_vec[i];
     }
 
     for (int i = 0; i < int(left_hand_des_pos_vec.size()/2); i++){
       joint_message.position[i + 14] =  left_hand_des_pos_vec[i];
       joint_message.position[i + 24] =  left_hand_des_pos_vec[i + 5];
+
       joint_message.velocity[i + 14] =  left_hand_des_vel_vec[i];
       joint_message.velocity[i + 24] =  left_hand_des_vel_vec[i + 5];
 
+      joint_message.effort[i + 14] =  left_hand_des_trq_vec[i];
+      joint_message.effort[i + 24] =  left_hand_des_trq_vec[i + 5];
+
       joint_message.position[i + 19] =  right_hand_des_pos_vec[i];
       joint_message.position[i + 29] =  right_hand_des_pos_vec[i + 5];
+
       joint_message.velocity[i + 19] =  right_hand_des_vel_vec[i];
       joint_message.velocity[i + 29] =  right_hand_des_vel_vec[i + 5];
+
+      joint_message.effort[i + 19] =  right_hand_des_trq_vec[i];
+      joint_message.effort[i + 29] =  right_hand_des_trq_vec[i + 5];
     }
 
     // RCLCPP_INFO(this->get_logger(), "Callback function running");
@@ -146,17 +186,25 @@ class AlexRobot : public rclcpp::Node{
     target_position = sin(amplitude * M_PI * frequency * time);
     target_velocity = amplitude * M_PI * cos(2 * M_PI * frequency * time);
 
-    left_arm_des_pos_vec[0] = target_position;
-    left_arm_des_vel_vec[0] = target_velocity;
+    // target_position = 45 * (M_PI / 180);
+    // target_velocity = 0;
 
-    right_arm_des_pos_vec[0] = target_position;
-    right_arm_des_vel_vec[0] = target_velocity;
+    // left_arm_des_pos_vec[0] = target_position;
+    // left_arm_des_vel_vec[0] = target_velocity;
 
-    left_hand_des_pos_vec[0] = target_position;
-    left_hand_des_vel_vec[0] = target_velocity;
+    for (int i = 0; i < int(left_arm_des_trq_vec.size()); i++){
 
-    right_hand_des_pos_vec[0] = target_position;
-    right_hand_des_vel_vec[0] = target_velocity;
+      left_arm_des_trq_vec[i] = kp_arm * (left_arm_des_pos_vec[i] - left_arm_cur_pos_vec[i]) + kd_arm * (left_arm_des_vel_vec[i] - left_arm_cur_vel_vec[i]);
+      right_arm_des_trq_vec[i] = kp_arm * (right_arm_des_pos_vec[i] - right_arm_cur_pos_vec[i]) + kd_arm * (right_arm_des_vel_vec[i] - right_arm_cur_vel_vec[i]);
+      
+    }    
+
+    for (int i = 0; i < int(left_hand_des_trq_vec.size()); i++){
+      
+      left_hand_des_trq_vec[i] = kp_hand * (left_hand_des_pos_vec[i] - left_hand_cur_pos_vec[i]) + kd_hand * (left_hand_des_vel_vec[i] - left_hand_cur_vel_vec[i]);
+      right_hand_des_trq_vec[i] = kp_hand * (right_hand_des_pos_vec[i] - right_hand_cur_pos_vec[i]) + kd_hand * (right_hand_des_vel_vec[i] - right_hand_cur_vel_vec[i]);
+      
+    }    
 
     // for(double &pos: joint_message.position){
     //   pos = target_position;
@@ -170,10 +218,17 @@ class AlexRobot : public rclcpp::Node{
 
     std::cout << "Time: " << time << std::endl;
 
+    // std::cout << "left_arm_des_trq_vec[3] =  " << left_arm_des_trq_vec[1] << std::endl;
+    // std::cout << left_arm_des_pos_vec[1] << " --- " << left_arm_cur_pos_vec[1] << " --- " << left_arm_des_pos_vec[1] - left_arm_cur_pos_vec[1] << std::endl;
+
+    // std::cout << "left_hand_des_trq_vec[0] =  " << left_hand_des_trq_vec[0] << std::endl;
+    // std::cout << left_hand_des_pos_vec[0] << " --- " << left_hand_cur_pos_vec[0] << " --- " << left_hand_des_pos_vec[0] - left_hand_cur_pos_vec[0] << std::endl;
+
   }
 
   private:
 
+  double kp_arm, kd_arm, kp_hand, kd_hand; 
   double frequency, time, amplitude, target_position, target_velocity;
 
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr alex_pub;
@@ -204,6 +259,11 @@ class AlexRobot : public rclcpp::Node{
   std::vector<double> right_hand_cur_pos_vec;
   std::vector<double> right_hand_cur_vel_vec;
 
+  std::vector<double> left_arm_des_trq_vec;
+  std::vector<double> right_arm_des_trq_vec;
+  std::vector<double> left_hand_des_trq_vec;
+  std::vector<double> right_hand_des_trq_vec;
+
 };
 
 int main(int argc, char ** argv)
@@ -213,7 +273,7 @@ int main(int argc, char ** argv)
   rclcpp::spin(std::make_shared<AlexRobot>());
   rclcpp::shutdown();
 
-  printf("hello world alex_robot_package package\n");
+  printf("alex_robot_package package executed sucessfully\n");
   return 0;
 }
 
