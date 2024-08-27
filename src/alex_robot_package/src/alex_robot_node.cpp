@@ -299,7 +299,7 @@ class AlexRobot : public rclcpp::Node{
     right_arm_jacobian_solver->JntToJac(right_arm_joint_positions, right_arm_jacobian);
 
     std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian.data << std::endl;
-    std::cout << "Right Arm Jacobian: \n" << right_arm_jacobian.data << std::endl;
+    std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian.data << std::endl;
 
     }
 
