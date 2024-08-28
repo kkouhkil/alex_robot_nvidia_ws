@@ -88,20 +88,24 @@ class AlexRobot : public rclcpp::Node{
     right_hand_des_trq_vec = Eigen::VectorXd(10);
 
     // left_arm - end-effector - position - desired and current
-    left_arm_des_end_eff_pose_vec = Eigen::VectorXd(6); // P.x = 0.30 P.y = 0.50  P.z = 0.30  O.x = -2.5 * M_PI/180 O.y = -65 M_PI/180  O.z = 15 M_PI/180
+    left_arm_des_end_eff_pose_vec = Eigen::VectorXd(6); // P.x = 0.30 P.y = 0.50  P.z = 0.30  O.x = -2.5 * M_PI/180 O.y = -65 * M_PI/180  O.z = 15 * M_PI/180
     left_arm_cur_end_eff_pose_vec = Eigen::VectorXd(6);
+    left_arm_end_eff_pose_error = Eigen::VectorXd(6);
 
     // right_arm - end-effector - position - desired and current
-    right_arm_des_end_eff_pose_vec = Eigen::VectorXd(6); // P.x = 0.30  P.y = -0.50 P.z = 0.30  O.x = 2.5 M_PI/180  O.y = -65 M_PI/180  O.z = -15 M_PI/180
+    right_arm_des_end_eff_pose_vec = Eigen::VectorXd(6); // P.x = 0.30  P.y = -0.50 P.z = 0.30  O.x = 2.5 * M_PI/180  O.y = -65 * M_PI/180  O.z = -15 * M_PI/180
     right_arm_cur_end_eff_pose_vec = Eigen::VectorXd(6);
+    right_arm_end_eff_pose_error = Eigen::VectorXd(6);
 
     // left_arm - end-effector - velocity - desired and current
     left_arm_des_end_eff_vel_vec = Eigen::VectorXd(6);
     left_arm_cur_end_eff_vel_vec = Eigen::VectorXd(6);
+    left_arm_end_eff_vel_error = Eigen::VectorXd(6);
 
     // right_arm - end-effector - velocity - desired and current
     right_arm_des_end_eff_vel_vec = Eigen::VectorXd(6);
     right_arm_cur_end_eff_vel_vec = Eigen::VectorXd(6);
+    right_arm_end_eff_vel_error = Eigen::VectorXd(6);
 
     // left_arm - variable values initialisation
     left_arm_des_vel_vec.setZero();
@@ -177,6 +181,11 @@ class AlexRobot : public rclcpp::Node{
 
     frequency = 0.1;
     amplitude = 1.0;
+
+    // robot control mode (1 or 2)
+    // 1 -> joint-space control mode
+    // 2 -> task-space control mode
+    control_mode = 1;
   }
 
   // URDF parsing and kinematics setup
@@ -293,33 +302,50 @@ class AlexRobot : public rclcpp::Node{
     target_position = sin(amplitude * M_PI * frequency * time);
     target_velocity = amplitude * M_PI * cos(2 * M_PI * frequency * time);
 
+    // left arm end-effector desired pose
+    left_arm_des_end_eff_pose_vec << 0.30, 0.50, 0.30, -2.5 * M_PI/180, -65 * M_PI/180, 15 * M_PI/180;
+
+    // right arm end-effector desired pose
+    right_arm_des_end_eff_pose_vec << 0.30, -0.50, 0.30, 2.5 * M_PI/180, -65 * M_PI/180, -15 * M_PI/180;
+
+    // left arm end-effector - pose and velocity error
+    left_arm_end_eff_pose_error = left_arm_des_end_eff_pose_vec - left_arm_cur_end_eff_pose_vec;
+    left_arm_end_eff_vel_error = left_arm_des_end_eff_vel_vec - left_arm_cur_end_eff_vel_vec;
+
+    // right arm end-effector - pose and velocity error
+    right_arm_end_eff_pose_error = right_arm_des_end_eff_pose_vec - right_arm_cur_end_eff_pose_vec;
+    right_arm_end_eff_vel_error = right_arm_des_end_eff_vel_vec - right_arm_cur_end_eff_vel_vec;
+
     // left_arm_des_pos_vec[0] = target_position;
     // right_arm_des_pos_vec[0] = target_position;
 
     // left_arm_des_vel_vec[0] = target_velocity;
     // right_arm_des_vel_vec[0] = target_velocity;
 
-    // Joint-Space control - robot arms
-    for (int i = 0; i < int(left_arm_des_trq_vec.size()); i++){
+    if (control_mode == 1) {
 
-      left_arm_des_trq_vec[i] = kp_arm_joint_space * (left_arm_des_pos_vec[i] - left_arm_cur_pos_vec[i]) + kd_arm_joint_space * (left_arm_des_vel_vec[i] - left_arm_cur_vel_vec[i]);
-      right_arm_des_trq_vec[i] = kp_arm_joint_space * (right_arm_des_pos_vec[i] - right_arm_cur_pos_vec[i]) + kd_arm_joint_space * (right_arm_des_vel_vec[i] - right_arm_cur_vel_vec[i]);
-      
-    }    
+      // Joint-Space control - robot arms
+      for (int i = 0; i < int(left_arm_des_trq_vec.size()); i++){
 
-    // Joint-Space control - robot hands
-    for (int i = 0; i < int(left_hand_des_trq_vec.size()); i++){
+        left_arm_des_trq_vec[i] = kp_arm_joint_space * (left_arm_des_pos_vec[i] - left_arm_cur_pos_vec[i]) + kd_arm_joint_space * (left_arm_des_vel_vec[i] - left_arm_cur_vel_vec[i]);
+        right_arm_des_trq_vec[i] = kp_arm_joint_space * (right_arm_des_pos_vec[i] - right_arm_cur_pos_vec[i]) + kd_arm_joint_space * (right_arm_des_vel_vec[i] - right_arm_cur_vel_vec[i]);
       
-      left_hand_des_trq_vec[i] = kp_hand * (left_hand_des_pos_vec[i] - left_hand_cur_pos_vec[i]) + kd_hand * (left_hand_des_vel_vec[i] - left_hand_cur_vel_vec[i]);
-      right_hand_des_trq_vec[i] = kp_hand * (right_hand_des_pos_vec[i] - right_hand_cur_pos_vec[i]) + kd_hand * (right_hand_des_vel_vec[i] - right_hand_cur_vel_vec[i]);
-      
-    }    
+      }    
 
-    // Task-Space control
-
-    // left_arm_des_trq_vec = Kd_matrix * (left_arm_des_end_eff_pose_vec - left_arm_cur_end_eff_pose_vec) + Kd_matrix * (left_arm_des_end_eff_vel_vec - left_arm_cur_end_eff_vel_vec);
-    // right_arm_des_trq_vec = Kd_matrix * (right_arm_des_end_eff_pose_vec - right_arm_cur_end_eff_pose_vec) + Kd_matrix * (left_arm_des_end_eff_vel_vec - left_arm_cur_end_eff_vel_vec);
+      // Joint-Space control - robot hands
+      for (int i = 0; i < int(left_hand_des_trq_vec.size()); i++){
       
+        left_hand_des_trq_vec[i] = kp_hand * (left_hand_des_pos_vec[i] - left_hand_cur_pos_vec[i]) + kd_hand * (left_hand_des_vel_vec[i] - left_hand_cur_vel_vec[i]);
+        right_hand_des_trq_vec[i] = kp_hand * (right_hand_des_pos_vec[i] - right_hand_cur_pos_vec[i]) + kd_hand * (right_hand_des_vel_vec[i] - right_hand_cur_vel_vec[i]);
+      
+      }  
+    } else if (control_mode == 2){
+
+      // Task-Space control
+      left_arm_des_trq_vec =  left_arm_jacobian_matrix.transpose() * (Kp_matrix * 15 * (left_arm_end_eff_pose_error) + 0.1 * Kd_matrix * (left_arm_end_eff_vel_error));
+      right_arm_des_trq_vec = right_arm_jacobian_matrix.transpose() * (Kp_matrix * 15 * (right_arm_end_eff_pose_error) + 0.1 * Kd_matrix * (right_arm_end_eff_vel_error));
+    }
+  
     // for(double &pos: joint_message.position){
     //   pos = target_position;
     // }
@@ -446,20 +472,27 @@ class AlexRobot : public rclcpp::Node{
     std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian_matrix << std::endl;
     std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian_matrix << std::endl;
 
-    std::cout << std::endl << "Left Arm End-Effector Current Pose: " << "\tP.x = " << left_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << left_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << left_arm_cur_end_eff_pose_vec[2] 
+    std::cout << std::endl << "Left  Arm End-Effector Current Pose: " << "\tP.x = " << left_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << left_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << left_arm_cur_end_eff_pose_vec[2] 
                                                              << "\tO.x = " << left_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << left_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << left_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
 
     std::cout << "Right Arm End-Effector Current Pose: " << "\tP.x = " << right_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << right_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << right_arm_cur_end_eff_pose_vec[2] 
                                                  << "\tO.x = " << right_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << right_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << right_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
 
-    std::cout << std::endl << "Left Arm End-Effector Current Velocity: " << left_arm_cur_end_eff_vel_vec.transpose() << std::endl;
+    std::cout << std::endl << "Left  Arm End-effector Pose error: " << left_arm_end_eff_pose_error.transpose() << std::endl;
+    std::cout << "Right Arm End-effector Pose error: " << right_arm_end_eff_pose_error.transpose() << std::endl;
+
+    std::cout << std::endl << "Left  Arm End-Effector Current Velocity: " << left_arm_cur_end_eff_vel_vec.transpose() << std::endl;
     std::cout << "Right Arm End-Effector Current Velocity: " << right_arm_cur_end_eff_vel_vec.transpose() << std::endl;
+
+    std::cout << std::endl << "Left  Arm Joint Torques:  = " << left_arm_des_trq_vec.transpose() << std::endl;
+    std::cout << "Right Arm Joint Torques: = " << right_arm_des_trq_vec.transpose() << std::endl;
   }
 
   private:
 
   double kp_arm_joint_space, kd_arm_joint_space, kp_hand, kd_hand; 
   double frequency, time, amplitude, target_position, target_velocity;
+  double control_mode;
 
   double left_arm_roll, left_arm_pitch, left_arm_yaw;
   double right_arm_roll, right_arm_pitch, right_arm_yaw;
@@ -501,10 +534,16 @@ class AlexRobot : public rclcpp::Node{
   Eigen::VectorXd left_arm_des_end_eff_vel_vec;
   Eigen::VectorXd left_arm_cur_end_eff_vel_vec;
 
+  Eigen::VectorXd left_arm_end_eff_pose_error;
+  Eigen::VectorXd left_arm_end_eff_vel_error;
+
   Eigen::VectorXd right_arm_des_end_eff_pose_vec;
   Eigen::VectorXd right_arm_cur_end_eff_pose_vec;
   Eigen::VectorXd right_arm_des_end_eff_vel_vec;
   Eigen::VectorXd right_arm_cur_end_eff_vel_vec;
+
+  Eigen::VectorXd right_arm_end_eff_pose_error;
+  Eigen::VectorXd right_arm_end_eff_vel_error;
 
   // KDL chains for left and right arms
   KDL::Chain left_arm_chain;
