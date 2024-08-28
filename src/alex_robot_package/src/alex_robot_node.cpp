@@ -6,6 +6,7 @@
 #include <ctime>
 #include <chrono>
 #include <cmath>
+#include <eigen3/Eigen/Eigen>
 
 using namespace std;
 
@@ -93,6 +94,9 @@ class AlexRobot : public rclcpp::Node{
     // right_arm - end-effector - desired and current
     right_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     right_arm_cur_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    left_arm_jacobian_matrix = Eigen::MatrixXd::Zero(6, 7);
+    right_arm_jacobian_matrix = Eigen::MatrixXd::Zero(6, 7);
 
     // joint-message - Position
     joint_message.position = {0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 
@@ -298,8 +302,16 @@ class AlexRobot : public rclcpp::Node{
     left_arm_jacobian_solver->JntToJac(left_arm_joint_positions, left_arm_jacobian);
     right_arm_jacobian_solver->JntToJac(right_arm_joint_positions, right_arm_jacobian);
 
-    std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian.data << std::endl;
-    std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian.data << std::endl;
+    for (int i = 0; i < int(left_arm_des_pos_vec.size() - 1); i++){
+      for (int j = 0; j < int(left_arm_des_pos_vec.size()); j++){
+        
+        left_arm_jacobian_matrix(i , j) = left_arm_jacobian.data(i, j);
+        right_arm_jacobian_matrix(i , j) = right_arm_jacobian.data(i, j);
+      }
+    }
+
+    std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian_matrix << std::endl;
+    std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian_matrix << std::endl;
 
     }
 
@@ -437,6 +449,10 @@ class AlexRobot : public rclcpp::Node{
   // Forward kinematics solvers
   std::shared_ptr<KDL::ChainFkSolverPos_recursive> left_arm_fk_solver;
   std::shared_ptr<KDL::ChainFkSolverPos_recursive> right_arm_fk_solver;
+
+  // Jacobian Matrix
+  Eigen::MatrixXd left_arm_jacobian_matrix;
+  Eigen::MatrixXd right_arm_jacobian_matrix;
 
 };
 
