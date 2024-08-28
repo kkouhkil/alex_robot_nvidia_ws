@@ -56,52 +56,91 @@ class AlexRobot : public rclcpp::Node{
     initializeKinematics();
 
     // left_arm  =  joint_message.position[0, 2, 4, 6, 8, 10, 12]
-    left_arm_des_pos_vec  = {-30 * M_PI/180, 75 * M_PI/180, 0.0, -60 * M_PI/180, 45 * M_PI/180, 0.0, 0.0};
-    left_arm_des_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    left_arm_cur_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    left_arm_cur_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    left_arm_des_pos_vec  = Eigen::VectorXd(7);
+    left_arm_des_vel_vec  = Eigen::VectorXd(7);
+    left_arm_cur_pos_vec  = Eigen::VectorXd(7);
+    left_arm_cur_vel_vec  = Eigen::VectorXd(7);
+    left_arm_des_trq_vec  = Eigen::VectorXd(7);
 
-    left_arm_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    left_arm_des_pos_vec << -30 * M_PI/180, 75 * M_PI/180, 0.0, -60 * M_PI/180, 45 * M_PI/180, 0.0, 0.0;
 
     // right_arm =  joint_message.position[1, 3, 5, 7, 9, 11, 13]
-    right_arm_des_pos_vec  = {-30 * M_PI/180, -75 * M_PI/180, 0.0, -60 * M_PI/180, -45 * M_PI/180, 0.0, 0.0};   
-    right_arm_des_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    right_arm_cur_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};   
-    right_arm_cur_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    right_arm_des_pos_vec = Eigen::VectorXd(7);
+    right_arm_des_vel_vec = Eigen::VectorXd(7);
+    right_arm_cur_pos_vec = Eigen::VectorXd(7);
+    right_arm_cur_vel_vec = Eigen::VectorXd(7);
+    right_arm_des_trq_vec = Eigen::VectorXd(7);
 
-    right_arm_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    right_arm_des_pos_vec << -30 * M_PI/180, -75 * M_PI/180, 0.0, -60 * M_PI/180, -45 * M_PI/180, 0.0, 0.0;
 
     // left_hand  = joint_message.position[14, 15, 16, 17, 18, 24, 25, 26, 27, 28]
-    left_hand_des_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    left_hand_des_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    left_hand_cur_pos_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    left_hand_cur_vel_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-
-    left_hand_des_trq_vec  = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    left_hand_des_pos_vec = Eigen::VectorXd(10);
+    left_hand_des_vel_vec = Eigen::VectorXd(10);
+    left_hand_cur_pos_vec = Eigen::VectorXd(10);
+    left_hand_cur_vel_vec = Eigen::VectorXd(10);
+    left_hand_des_trq_vec = Eigen::VectorXd(10);
 
     // right_hand = joint_message.position[19, 20, 21, 22, 23, 29, 30, 31, 32, 33]
-    right_hand_des_pos_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
-    right_hand_des_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
-    right_hand_cur_pos_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
-    right_hand_cur_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; 
-
-    right_hand_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    right_hand_des_pos_vec = Eigen::VectorXd(10);
+    right_hand_des_vel_vec = Eigen::VectorXd(10);
+    right_hand_cur_pos_vec = Eigen::VectorXd(10);
+    right_hand_cur_vel_vec = Eigen::VectorXd(10);
+    right_hand_des_trq_vec = Eigen::VectorXd(10);
 
     // left_arm - end-effector - position - desired and current
-    left_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // P.x = 0.30 P.y = 0.50  P.z = 0.30  O.x = -2.5 * M_PI/180 O.y = -65 M_PI/180  O.z = 15 M_PI/180
-    left_arm_cur_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    left_arm_des_end_eff_pose_vec = Eigen::VectorXd(6); // P.x = 0.30 P.y = 0.50  P.z = 0.30  O.x = -2.5 * M_PI/180 O.y = -65 M_PI/180  O.z = 15 M_PI/180
+    left_arm_cur_end_eff_pose_vec = Eigen::VectorXd(6);
 
     // right_arm - end-effector - position - desired and current
-    right_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // P.x = 0.30  P.y = -0.50 P.z = 0.30  O.x = 2.5 M_PI/180  O.y = -65 M_PI/180  O.z = -15 M_PI/180
-    right_arm_cur_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    right_arm_des_end_eff_pose_vec = Eigen::VectorXd(6); // P.x = 0.30  P.y = -0.50 P.z = 0.30  O.x = 2.5 M_PI/180  O.y = -65 M_PI/180  O.z = -15 M_PI/180
+    right_arm_cur_end_eff_pose_vec = Eigen::VectorXd(6);
 
     // left_arm - end-effector - velocity - desired and current
-    left_arm_des_end_eff_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    left_arm_cur_end_eff_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    left_arm_des_end_eff_vel_vec = Eigen::VectorXd(6);
+    left_arm_cur_end_eff_vel_vec = Eigen::VectorXd(6);
 
     // right_arm - end-effector - velocity - desired and current
-    right_arm_des_end_eff_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-    right_arm_cur_end_eff_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    right_arm_des_end_eff_vel_vec = Eigen::VectorXd(6);
+    right_arm_cur_end_eff_vel_vec = Eigen::VectorXd(6);
+
+    // left_arm - variable values initialisation
+    left_arm_des_vel_vec.setZero();
+    left_arm_cur_pos_vec.setZero();
+    left_arm_cur_vel_vec.setZero();
+
+    left_arm_des_trq_vec.setZero();
+
+    left_arm_des_end_eff_pose_vec.setZero();
+    left_arm_cur_end_eff_pose_vec.setZero();
+    left_arm_des_end_eff_vel_vec.setZero();
+    left_arm_cur_end_eff_vel_vec.setZero();
+
+    left_hand_des_pos_vec.setZero();
+    left_hand_des_vel_vec.setZero();
+    left_hand_cur_pos_vec.setZero();
+    left_hand_cur_vel_vec.setZero();
+
+    left_hand_des_trq_vec.setZero();
+
+    // right_arm - variable values initialisation
+    right_arm_des_vel_vec.setZero();
+    right_arm_cur_pos_vec.setZero();
+    right_arm_cur_vel_vec.setZero();
+
+    right_arm_des_trq_vec.setZero();
+
+    right_arm_des_end_eff_pose_vec.setZero();
+    right_arm_cur_end_eff_pose_vec.setZero();
+
+    right_arm_des_end_eff_vel_vec.setZero();
+    right_arm_cur_end_eff_vel_vec.setZero();
+
+    right_hand_des_pos_vec.setZero();
+    right_hand_des_vel_vec.setZero();
+    right_hand_cur_pos_vec.setZero();
+    right_hand_cur_vel_vec.setZero();
+
+    right_hand_des_trq_vec.setZero();
 
     // jacobian matrices initialisation
     left_arm_jacobian_matrix = Eigen::MatrixXd::Zero(6, 7);
@@ -197,6 +236,9 @@ class AlexRobot : public rclcpp::Node{
       right_hand_cur_vel_vec[i]     = msg->velocity[i + 19];
       right_hand_cur_vel_vec[i + 5] = msg->velocity[i + 29];
     }
+
+    left_arm_cur_end_eff_vel_vec = left_arm_jacobian_matrix * left_arm_cur_vel_vec;
+    right_arm_cur_end_eff_vel_vec = right_arm_jacobian_matrix * right_arm_cur_vel_vec;
 
     // print out the first joint name and position
     // if (!msg->name.empty() && !msg->position.empty()) {
@@ -404,12 +446,14 @@ class AlexRobot : public rclcpp::Node{
     std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian_matrix << std::endl;
     std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian_matrix << std::endl;
 
-    std::cout << std::endl << "Left Arm End-Effector Pose: " << "\tP.x = " << left_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << left_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << left_arm_cur_end_eff_pose_vec[2] 
+    std::cout << std::endl << "Left Arm End-Effector Current Pose: " << "\tP.x = " << left_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << left_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << left_arm_cur_end_eff_pose_vec[2] 
                                                              << "\tO.x = " << left_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << left_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << left_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
 
-    std::cout << "Right Arm End-Effector Pose: " << "\tP.x = " << right_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << right_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << right_arm_cur_end_eff_pose_vec[2] 
+    std::cout << "Right Arm End-Effector Current Pose: " << "\tP.x = " << right_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << right_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << right_arm_cur_end_eff_pose_vec[2] 
                                                  << "\tO.x = " << right_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << right_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << right_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
 
+    std::cout << std::endl << "Left Arm End-Effector Current Velocity: " << left_arm_cur_end_eff_vel_vec.transpose() << std::endl;
+    std::cout << "Right Arm End-Effector Current Velocity: " << right_arm_cur_end_eff_vel_vec.transpose() << std::endl;
   }
 
   private:
@@ -428,40 +472,39 @@ class AlexRobot : public rclcpp::Node{
 
   sensor_msgs::msg::JointState joint_message;
   
-  std::vector<double> left_arm_des_pos_vec;
-  std::vector<double> left_arm_des_vel_vec;
-  std::vector<double> left_arm_cur_pos_vec;
-  std::vector<double> left_arm_cur_vel_vec;
+  Eigen::VectorXd left_arm_des_pos_vec;
+  Eigen::VectorXd left_arm_des_vel_vec;
+  Eigen::VectorXd left_arm_cur_pos_vec;
+  Eigen::VectorXd left_arm_cur_vel_vec;
+  Eigen::VectorXd left_arm_des_trq_vec;
 
-  std::vector<double> right_arm_des_pos_vec;
-  std::vector<double> right_arm_des_vel_vec;
-  std::vector<double> right_arm_cur_pos_vec;
-  std::vector<double> right_arm_cur_vel_vec;
+  Eigen::VectorXd right_arm_des_pos_vec;
+  Eigen::VectorXd right_arm_des_vel_vec;
+  Eigen::VectorXd right_arm_cur_pos_vec;
+  Eigen::VectorXd right_arm_cur_vel_vec;
+  Eigen::VectorXd right_arm_des_trq_vec;
 
-  std::vector<double> left_hand_des_pos_vec;
-  std::vector<double> left_hand_des_vel_vec;
-  std::vector<double> left_hand_cur_pos_vec;
-  std::vector<double> left_hand_cur_vel_vec;
+  Eigen::VectorXd left_hand_des_pos_vec;
+  Eigen::VectorXd left_hand_des_vel_vec;
+  Eigen::VectorXd left_hand_cur_pos_vec;
+  Eigen::VectorXd left_hand_cur_vel_vec;
+  Eigen::VectorXd left_hand_des_trq_vec;
 
-  std::vector<double> right_hand_des_pos_vec;
-  std::vector<double> right_hand_des_vel_vec;
-  std::vector<double> right_hand_cur_pos_vec;
-  std::vector<double> right_hand_cur_vel_vec;
+  Eigen::VectorXd right_hand_des_pos_vec;
+  Eigen::VectorXd right_hand_des_vel_vec;
+  Eigen::VectorXd right_hand_cur_pos_vec;
+  Eigen::VectorXd right_hand_cur_vel_vec;
+  Eigen::VectorXd right_hand_des_trq_vec;
 
-  std::vector<double> left_arm_des_end_eff_pose_vec;
-  std::vector<double> left_arm_des_end_eff_vel_vec;
-  std::vector<double> right_arm_des_end_eff_pose_vec;
-  std::vector<double> right_arm_des_end_eff_vel_vec;
+  Eigen::VectorXd left_arm_des_end_eff_pose_vec;
+  Eigen::VectorXd left_arm_cur_end_eff_pose_vec;
+  Eigen::VectorXd left_arm_des_end_eff_vel_vec;
+  Eigen::VectorXd left_arm_cur_end_eff_vel_vec;
 
-  std::vector<double> left_arm_cur_end_eff_pose_vec;
-  std::vector<double> left_arm_cur_end_eff_vel_vec;
-  std::vector<double> right_arm_cur_end_eff_pose_vec;
-  std::vector<double> right_arm_cur_end_eff_vel_vec;
-
-  std::vector<double> left_arm_des_trq_vec;
-  std::vector<double> right_arm_des_trq_vec;
-  std::vector<double> left_hand_des_trq_vec;
-  std::vector<double> right_hand_des_trq_vec;
+  Eigen::VectorXd right_arm_des_end_eff_pose_vec;
+  Eigen::VectorXd right_arm_cur_end_eff_pose_vec;
+  Eigen::VectorXd right_arm_des_end_eff_vel_vec;
+  Eigen::VectorXd right_arm_cur_end_eff_vel_vec;
 
   // KDL chains for left and right arms
   KDL::Chain left_arm_chain;
