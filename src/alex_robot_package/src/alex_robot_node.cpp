@@ -87,16 +87,29 @@ class AlexRobot : public rclcpp::Node{
 
     right_hand_des_trq_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-    // left_arm - end-effector - desired and current
-    left_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    // left_arm - end-effector - position - desired and current
+    left_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // P.x = 0.30 P.y = 0.50  P.z = 0.30  O.x = -2.5 * M_PI/180 O.y = -65 M_PI/180  O.z = 15 M_PI/180
     left_arm_cur_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-    // right_arm - end-effector - desired and current
-    right_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    // right_arm - end-effector - position - desired and current
+    right_arm_des_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // P.x = 0.30  P.y = -0.50 P.z = 0.30  O.x = 2.5 M_PI/180  O.y = -65 M_PI/180  O.z = -15 M_PI/180
     right_arm_cur_end_eff_pose_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+    // left_arm - end-effector - velocity - desired and current
+    left_arm_des_end_eff_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    left_arm_cur_end_eff_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    // right_arm - end-effector - velocity - desired and current
+    right_arm_des_end_eff_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    right_arm_cur_end_eff_vel_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    // jacobian matrices initialisation
     left_arm_jacobian_matrix = Eigen::MatrixXd::Zero(6, 7);
     right_arm_jacobian_matrix = Eigen::MatrixXd::Zero(6, 7);
+
+    // stiffness and damping matrices initialisation
+    Kp_matrix = Eigen::MatrixXd::Identity(6, 6);
+    Kd_matrix = Eigen::MatrixXd::Identity(6, 6);
 
     // joint-message - Position
     joint_message.position = {0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 
@@ -117,11 +130,11 @@ class AlexRobot : public rclcpp::Node{
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     // controller PD gains
-    kp_arm = 25;
-    kd_arm = 2.5;
+    kp_arm_joint_space = 25;
+    kd_arm_joint_space = 1;
 
     kp_hand = 0.125;
-    kd_hand = 0.0125;
+    kd_hand = 0.00125;
 
     frequency = 0.1;
     amplitude = 1.0;
@@ -167,22 +180,22 @@ class AlexRobot : public rclcpp::Node{
     for (int i = 0; i < int(left_arm_cur_pos_vec.size()); i++){
 
       left_arm_cur_pos_vec[i] = msg->position[2 * i];
-      left_arm_cur_vel_vec[i] = msg->position[2 * i];
+      left_arm_cur_vel_vec[i] = msg->velocity[2 * i];
 
       right_arm_cur_pos_vec[i] = msg->position[2 * i + 1];
-      right_arm_cur_vel_vec[i] = msg->position[2 * i + 1];
+      right_arm_cur_vel_vec[i] = msg->velocity[2 * i + 1];
     }
 
     for (int i = 0; i < int(left_hand_cur_pos_vec.size()/2); i++){
       left_hand_cur_pos_vec[i]     = msg->position[i + 14];
       left_hand_cur_pos_vec[i + 5] = msg->position[i + 24];
-      left_hand_cur_vel_vec[i]     = msg->position[i + 14];
-      left_hand_cur_vel_vec[i + 5] = msg->position[i + 24];
+      left_hand_cur_vel_vec[i]     = msg->velocity[i + 14];
+      left_hand_cur_vel_vec[i + 5] = msg->velocity[i + 24];
 
       right_hand_cur_pos_vec[i]     = msg->position[i + 19];
       right_hand_cur_pos_vec[i + 5] = msg->position[i + 29];
-      right_hand_cur_vel_vec[i]     = msg->position[i + 19];
-      right_hand_cur_vel_vec[i + 5] = msg->position[i + 29];
+      right_hand_cur_vel_vec[i]     = msg->velocity[i + 19];
+      right_hand_cur_vel_vec[i + 5] = msg->velocity[i + 29];
     }
 
     // print out the first joint name and position
@@ -244,13 +257,15 @@ class AlexRobot : public rclcpp::Node{
     // left_arm_des_vel_vec[0] = target_velocity;
     // right_arm_des_vel_vec[0] = target_velocity;
 
+    // Joint-Space control - robot arms
     for (int i = 0; i < int(left_arm_des_trq_vec.size()); i++){
 
-      left_arm_des_trq_vec[i] = kp_arm * (left_arm_des_pos_vec[i] - left_arm_cur_pos_vec[i]) + kd_arm * (left_arm_des_vel_vec[i] - left_arm_cur_vel_vec[i]);
-      right_arm_des_trq_vec[i] = kp_arm * (right_arm_des_pos_vec[i] - right_arm_cur_pos_vec[i]) + kd_arm * (right_arm_des_vel_vec[i] - right_arm_cur_vel_vec[i]);
+      left_arm_des_trq_vec[i] = kp_arm_joint_space * (left_arm_des_pos_vec[i] - left_arm_cur_pos_vec[i]) + kd_arm_joint_space * (left_arm_des_vel_vec[i] - left_arm_cur_vel_vec[i]);
+      right_arm_des_trq_vec[i] = kp_arm_joint_space * (right_arm_des_pos_vec[i] - right_arm_cur_pos_vec[i]) + kd_arm_joint_space * (right_arm_des_vel_vec[i] - right_arm_cur_vel_vec[i]);
       
     }    
 
+    // Joint-Space control - robot hands
     for (int i = 0; i < int(left_hand_des_trq_vec.size()); i++){
       
       left_hand_des_trq_vec[i] = kp_hand * (left_hand_des_pos_vec[i] - left_hand_cur_pos_vec[i]) + kd_hand * (left_hand_des_vel_vec[i] - left_hand_cur_vel_vec[i]);
@@ -258,6 +273,11 @@ class AlexRobot : public rclcpp::Node{
       
     }    
 
+    // Task-Space control
+
+    // left_arm_des_trq_vec = Kd_matrix * (left_arm_des_end_eff_pose_vec - left_arm_cur_end_eff_pose_vec) + Kd_matrix * (left_arm_des_end_eff_vel_vec - left_arm_cur_end_eff_vel_vec);
+    // right_arm_des_trq_vec = Kd_matrix * (right_arm_des_end_eff_pose_vec - right_arm_cur_end_eff_pose_vec) + Kd_matrix * (left_arm_des_end_eff_vel_vec - left_arm_cur_end_eff_vel_vec);
+      
     // for(double &pos: joint_message.position){
     //   pos = target_position;
     // }
@@ -272,20 +292,15 @@ class AlexRobot : public rclcpp::Node{
     // Compute forward kinematics for left and right arms
     computeForwardKinematics();
 
+    // Printing Robot Data
+    printRobotData();
+
     // Publishing joint messages
     alex_pub->publish(joint_message);
 
-    std::cout << std::endl << "Time: " << time << std::endl << std::endl;
-
-    // std::cout << "left_arm_des_trq_vec[3] =  " << left_arm_des_trq_vec[1] << std::endl;
-    // std::cout << left_arm_des_pos_vec[1] << " --- " << left_arm_cur_pos_vec[1] << " --- " << left_arm_des_pos_vec[1] - left_arm_cur_pos_vec[1] << std::endl;
-
-    // std::cout << "left_hand_des_trq_vec[0] =  " << left_hand_des_trq_vec[0] << std::endl;
-    // std::cout << left_hand_des_pos_vec[0] << " --- " << left_hand_cur_pos_vec[0] << " --- " << left_hand_des_pos_vec[0] - left_hand_cur_pos_vec[0] << std::endl;
-
   }
 
-    // Function to compute Jacobian matrices for both arms
+  // Function to compute Jacobian matrices for both arms
   void computeJacobian() {
 
     KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
@@ -310,12 +325,9 @@ class AlexRobot : public rclcpp::Node{
       }
     }
 
-    std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian_matrix << std::endl;
-    std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian_matrix << std::endl;
-
     }
 
-    // Function to compute forward kinematics for both arms
+  // Function to compute forward kinematics for both arms
   void computeForwardKinematics() {
 
     KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
@@ -383,17 +395,26 @@ class AlexRobot : public rclcpp::Node{
     right_arm_cur_end_eff_pose_vec[4] =  right_arm_pitch;
     right_arm_cur_end_eff_pose_vec[5] =  right_arm_yaw;
 
+    }
+
+  void printRobotData(){
+
+    std::cout << std::endl << "Time: " << time << std::endl << std::endl;
+
+    std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian_matrix << std::endl;
+    std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian_matrix << std::endl;
+
     std::cout << std::endl << "Left Arm End-Effector Pose: " << "\tP.x = " << left_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << left_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << left_arm_cur_end_eff_pose_vec[2] 
-                                                             << "\tO.x = " << left_arm_cur_end_eff_pose_vec[3] << "\tO.y = " << left_arm_cur_end_eff_pose_vec[4] << "\tO.z = " << left_arm_cur_end_eff_pose_vec[5] << std::endl;
+                                                             << "\tO.x = " << left_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << left_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << left_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
 
     std::cout << "Right Arm End-Effector Pose: " << "\tP.x = " << right_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << right_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << right_arm_cur_end_eff_pose_vec[2] 
-                                                 << "\tO.x = " << right_arm_cur_end_eff_pose_vec[3] << "\tO.y = " << right_arm_cur_end_eff_pose_vec[4] << "\tO.z = " << right_arm_cur_end_eff_pose_vec[5] << std::endl;
+                                                 << "\tO.x = " << right_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << right_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << right_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
 
-    }
+  }
 
   private:
 
-  double kp_arm, kd_arm, kp_hand, kd_hand; 
+  double kp_arm_joint_space, kd_arm_joint_space, kp_hand, kd_hand; 
   double frequency, time, amplitude, target_position, target_velocity;
 
   double left_arm_roll, left_arm_pitch, left_arm_yaw;
@@ -428,10 +449,14 @@ class AlexRobot : public rclcpp::Node{
   std::vector<double> right_hand_cur_vel_vec;
 
   std::vector<double> left_arm_des_end_eff_pose_vec;
+  std::vector<double> left_arm_des_end_eff_vel_vec;
   std::vector<double> right_arm_des_end_eff_pose_vec;
+  std::vector<double> right_arm_des_end_eff_vel_vec;
 
   std::vector<double> left_arm_cur_end_eff_pose_vec;
+  std::vector<double> left_arm_cur_end_eff_vel_vec;
   std::vector<double> right_arm_cur_end_eff_pose_vec;
+  std::vector<double> right_arm_cur_end_eff_vel_vec;
 
   std::vector<double> left_arm_des_trq_vec;
   std::vector<double> right_arm_des_trq_vec;
@@ -453,6 +478,10 @@ class AlexRobot : public rclcpp::Node{
   // Jacobian Matrix
   Eigen::MatrixXd left_arm_jacobian_matrix;
   Eigen::MatrixXd right_arm_jacobian_matrix;
+
+  // Stiffness and Damping matrices
+  Eigen::MatrixXd Kp_matrix;
+  Eigen::MatrixXd Kd_matrix;
 
 };
 
