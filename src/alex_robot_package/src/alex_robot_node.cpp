@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <ctime>
 #include <chrono>
@@ -178,17 +179,29 @@ class AlexRobot : public rclcpp::Node{
     kd_hand = 0.00125;
 
     frequency = 0.1;
-    amplitude = 1.0;
+    amplitude = 0.05;
 
     // robot control mode (1 or 2)
     // 1 -> joint-space control mode
     // 2 -> task-space control mode
     control_mode = 2;
 
+    // stiffness and damping - end-effector position
+    Kp_Matrix_pos = 250; 
+    Kd_Matrix_pos = 25;
+
+    // stiffness and damping - end-effector orientation (5, 1)
+    Kp_Matrix_ori = 3;
+    Kd_Matrix_ori = 1;
+
     // robot jacobian calculation method (1 or 2)
     // 1 -> jacobian calculation: KDL
     // 2 -> jacobian calculation: Numerical Calculation
     jacobian_calculation_method = 1;
+
+    // trajectory tracking activation mode
+    trajectory_tracking_activation = 0;
+
   }
 
   // URDF parsing and kinematics setup
@@ -291,16 +304,31 @@ class AlexRobot : public rclcpp::Node{
       joint_message.effort[i + 29] =  right_hand_des_trq_vec[i + 5];
     }
 
-    target_position = sin(amplitude * M_PI * frequency * time);
-    target_velocity = amplitude * M_PI * cos(2 * M_PI * frequency * time);
+    if (trajectory_tracking_activation == 1){
+      if (time >= 15){
+        target_position_sin = amplitude * sin(M_PI * frequency * time);
+        target_velocity_cos = M_PI * cos(2 * M_PI * frequency * time);
+
+        target_position_cos = amplitude * cos(M_PI * frequency * time);
+        target_velocity_sin = -M_PI * sin(2 * M_PI * frequency * time);
+
+        // left arm end-effector desired pose
+        left_arm_des_end_eff_pose_vec << 0.30, 0.50, 0.50 + target_position_sin, -2.5 * M_PI/180, -65 * M_PI/180, 15 * M_PI/180;
+
+        // right arm end-effector desired pose
+        right_arm_des_end_eff_pose_vec << 0.30, -0.50, 0.50 + target_position_cos, 2.5 * M_PI/180, -65 * M_PI/180, -15 * M_PI/180;
+
+        left_arm_des_end_eff_vel_vec(2) =  target_velocity_sin;
+        right_arm_des_end_eff_vel_vec(2) =  target_velocity_cos;
+
+      }
+    }
 
     // left arm end-effector desired pose
     left_arm_des_end_eff_pose_vec << 0.30, 0.50, 0.50, -2.5 * M_PI/180, -65 * M_PI/180, 15 * M_PI/180;
-    // left_arm_des_end_eff_pose_vec << 0.0, 0.50, 0.0, 0.0, 0.0, 0.0;
 
     // right arm end-effector desired pose
     right_arm_des_end_eff_pose_vec << 0.30, -0.50, 0.50, 2.5 * M_PI/180, -65 * M_PI/180, -15 * M_PI/180;
-    // right_arm_des_end_eff_pose_vec << 0.0, -0.50, 0.0, 0.0, 0.0, 0.0;
 
     // left arm end-effector - pose and velocity error
     left_arm_end_eff_pose_error = left_arm_des_end_eff_pose_vec - left_arm_cur_end_eff_pose_vec;
@@ -329,17 +357,15 @@ class AlexRobot : public rclcpp::Node{
       }  
     } else if (control_mode == 2){
 
-      Kp_matrix(3,3) = 0;
-      Kp_matrix(4,4) = 0;
-      Kp_matrix(5,5) = 0;
+      Kp_matrix(0,0) = Kp_Matrix_pos; Kp_matrix(1,1) = Kp_Matrix_pos; Kp_matrix(2,2) = Kp_Matrix_pos;
+      Kp_matrix(3,3) = Kp_Matrix_ori; Kp_matrix(4,4) = Kp_Matrix_ori; Kp_matrix(5,5) = Kp_Matrix_ori;
 
-      Kd_matrix(3,3) = 0;
-      Kd_matrix(4,4) = 0;
-      Kd_matrix(5,5) = 0;
+      Kd_matrix(0,0) = Kd_Matrix_pos; Kd_matrix(1,1) = Kd_Matrix_pos; Kd_matrix(2,2) = Kd_Matrix_pos;
+      Kd_matrix(3,3) = Kd_Matrix_ori; Kd_matrix(4,4) = Kd_Matrix_ori; Kd_matrix(5,5) = Kd_Matrix_ori;
 
       // Task-Space control
-      left_arm_des_trq_vec =  left_arm_jacobian_matrix.transpose() * (Kp_matrix * 150 * (left_arm_end_eff_pose_error) + 10 * Kd_matrix * (left_arm_end_eff_vel_error));
-      right_arm_des_trq_vec = right_arm_jacobian_matrix.transpose() * (Kp_matrix * 150 * (right_arm_end_eff_pose_error) + 10 * Kd_matrix * (right_arm_end_eff_vel_error));
+      left_arm_des_trq_vec  = left_arm_jacobian_matrix.transpose() * (Kp_matrix * (left_arm_end_eff_pose_error) + Kd_matrix * (left_arm_end_eff_vel_error));
+      right_arm_des_trq_vec = right_arm_jacobian_matrix.transpose() * (Kp_matrix * (right_arm_end_eff_pose_error) + Kd_matrix * (right_arm_end_eff_vel_error));
 
       // Joint-Space control - robot hands
       for (int i = 0; i < int(left_hand_des_trq_vec.size()); i++){
@@ -512,8 +538,11 @@ class AlexRobot : public rclcpp::Node{
     std::cout << "Right Arm End-Effector Current Pose: " << "\tP.x = " << right_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << right_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << right_arm_cur_end_eff_pose_vec[2] 
                                                  << "\tO.x = " << right_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << right_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << right_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
 
-    std::cout << std::endl << "Left  Arm End-effector Pose error: " << left_arm_end_eff_pose_error.transpose() << std::endl;
-    std::cout << "Right Arm End-effector Pose error: " << right_arm_end_eff_pose_error.transpose() << std::endl;
+    std::cout << std::endl << "Left  Arm End-effector Pose error: " << "\teP.x = " << left_arm_end_eff_pose_error[0] << "\teP.y = " << left_arm_end_eff_pose_error[1] << "\teP.z = " << left_arm_end_eff_pose_error[2] 
+                                                             << "\teO.x = " << left_arm_end_eff_pose_error[3] * 180/M_PI << "\teO.y = " << left_arm_end_eff_pose_error[4] * 180/M_PI << "\teO.z = " << left_arm_end_eff_pose_error[5] * 180/M_PI << std::endl;
+
+    std::cout << "Right Arm End-effector Pose error: " << "\teP.x = " << right_arm_end_eff_pose_error[0] << "\teP.y = " << right_arm_end_eff_pose_error[1] << "\teP.z = " << right_arm_end_eff_pose_error[2] 
+                                                 << "\teO.x = " << right_arm_end_eff_pose_error[3] * 180/M_PI << "\teO.y = " << right_arm_end_eff_pose_error[4] * 180/M_PI << "\teO.z = " << right_arm_end_eff_pose_error[5] * 180/M_PI << std::endl;
 
     std::cout << std::endl << "Left  Arm End-Effector Current Velocity: " << left_arm_cur_end_eff_vel_vec.transpose() << std::endl;
     std::cout << "Right Arm End-Effector Current Velocity: " << right_arm_cur_end_eff_vel_vec.transpose() << std::endl;
@@ -524,8 +553,8 @@ class AlexRobot : public rclcpp::Node{
 
   private:
 
-  double kp_arm_joint_space, kd_arm_joint_space, kp_hand, kd_hand; 
-  double frequency, time, amplitude, target_position, target_velocity;
+  double kp_arm_joint_space, kd_arm_joint_space, kp_hand, kd_hand, Kp_Matrix_pos, Kp_Matrix_ori, Kd_Matrix_pos, Kd_Matrix_ori; 
+  double frequency, time, amplitude, target_position_sin, target_velocity_cos, target_position_cos, target_velocity_sin, trajectory_tracking_activation;
   double control_mode, jacobian_calculation_method;
 
   double left_arm_roll, left_arm_pitch, left_arm_yaw;
