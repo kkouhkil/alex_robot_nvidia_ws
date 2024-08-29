@@ -1,8 +1,6 @@
 #include <cstdio>
 #include <iostream>
-
 #include <vector>
-
 #include <ctime>
 #include <chrono>
 #include <cmath>
@@ -185,7 +183,12 @@ class AlexRobot : public rclcpp::Node{
     // robot control mode (1 or 2)
     // 1 -> joint-space control mode
     // 2 -> task-space control mode
-    control_mode = 1;
+    control_mode = 2;
+
+    // robot jacobian calculation method (1 or 2)
+    // 1 -> jacobian calculation: KDL
+    // 2 -> jacobian calculation: Numerical Calculation
+    jacobian_calculation_method = 1;
   }
 
   // URDF parsing and kinematics setup
@@ -223,8 +226,6 @@ class AlexRobot : public rclcpp::Node{
   // Subscriber callback
   void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg){
 
-    // RCLCPP_INFO(this->get_logger(), "Received joint state update");
-    
     for (int i = 0; i < int(left_arm_cur_pos_vec.size()); i++){
 
       left_arm_cur_pos_vec[i] = msg->position[2 * i];
@@ -248,13 +249,6 @@ class AlexRobot : public rclcpp::Node{
 
     left_arm_cur_end_eff_vel_vec = left_arm_jacobian_matrix * left_arm_cur_vel_vec;
     right_arm_cur_end_eff_vel_vec = right_arm_jacobian_matrix * right_arm_cur_vel_vec;
-
-    // print out the first joint name and position
-    // if (!msg->name.empty() && !msg->position.empty()) {
-    //   RCLCPP_INFO(this->get_logger(), "First joint: %s, Position: %f", 
-    //               msg->name[0].c_str(), msg->position[0]);
-    // }
-
   }
 
   // Publisher callback
@@ -297,16 +291,16 @@ class AlexRobot : public rclcpp::Node{
       joint_message.effort[i + 29] =  right_hand_des_trq_vec[i + 5];
     }
 
-    // RCLCPP_INFO(this->get_logger(), "Callback function running");
-    
     target_position = sin(amplitude * M_PI * frequency * time);
     target_velocity = amplitude * M_PI * cos(2 * M_PI * frequency * time);
 
     // left arm end-effector desired pose
-    left_arm_des_end_eff_pose_vec << 0.30, 0.50, 0.30, -2.5 * M_PI/180, -65 * M_PI/180, 15 * M_PI/180;
+    left_arm_des_end_eff_pose_vec << 0.30, 0.50, 0.50, -2.5 * M_PI/180, -65 * M_PI/180, 15 * M_PI/180;
+    // left_arm_des_end_eff_pose_vec << 0.0, 0.50, 0.0, 0.0, 0.0, 0.0;
 
     // right arm end-effector desired pose
-    right_arm_des_end_eff_pose_vec << 0.30, -0.50, 0.30, 2.5 * M_PI/180, -65 * M_PI/180, -15 * M_PI/180;
+    right_arm_des_end_eff_pose_vec << 0.30, -0.50, 0.50, 2.5 * M_PI/180, -65 * M_PI/180, -15 * M_PI/180;
+    // right_arm_des_end_eff_pose_vec << 0.0, -0.50, 0.0, 0.0, 0.0, 0.0;
 
     // left arm end-effector - pose and velocity error
     left_arm_end_eff_pose_error = left_arm_des_end_eff_pose_vec - left_arm_cur_end_eff_pose_vec;
@@ -315,12 +309,6 @@ class AlexRobot : public rclcpp::Node{
     // right arm end-effector - pose and velocity error
     right_arm_end_eff_pose_error = right_arm_des_end_eff_pose_vec - right_arm_cur_end_eff_pose_vec;
     right_arm_end_eff_vel_error = right_arm_des_end_eff_vel_vec - right_arm_cur_end_eff_vel_vec;
-
-    // left_arm_des_pos_vec[0] = target_position;
-    // right_arm_des_pos_vec[0] = target_position;
-
-    // left_arm_des_vel_vec[0] = target_velocity;
-    // right_arm_des_vel_vec[0] = target_velocity;
 
     if (control_mode == 1) {
 
@@ -341,19 +329,27 @@ class AlexRobot : public rclcpp::Node{
       }  
     } else if (control_mode == 2){
 
+      Kp_matrix(3,3) = 0;
+      Kp_matrix(4,4) = 0;
+      Kp_matrix(5,5) = 0;
+
+      Kd_matrix(3,3) = 0;
+      Kd_matrix(4,4) = 0;
+      Kd_matrix(5,5) = 0;
+
       // Task-Space control
-      left_arm_des_trq_vec =  left_arm_jacobian_matrix.transpose() * (Kp_matrix * 15 * (left_arm_end_eff_pose_error) + 0.1 * Kd_matrix * (left_arm_end_eff_vel_error));
-      right_arm_des_trq_vec = right_arm_jacobian_matrix.transpose() * (Kp_matrix * 15 * (right_arm_end_eff_pose_error) + 0.1 * Kd_matrix * (right_arm_end_eff_vel_error));
+      left_arm_des_trq_vec =  left_arm_jacobian_matrix.transpose() * (Kp_matrix * 150 * (left_arm_end_eff_pose_error) + 10 * Kd_matrix * (left_arm_end_eff_vel_error));
+      right_arm_des_trq_vec = right_arm_jacobian_matrix.transpose() * (Kp_matrix * 150 * (right_arm_end_eff_pose_error) + 10 * Kd_matrix * (right_arm_end_eff_vel_error));
+
+      // Joint-Space control - robot hands
+      for (int i = 0; i < int(left_hand_des_trq_vec.size()); i++){
+      
+        left_hand_des_trq_vec[i] = kp_hand * (left_hand_des_pos_vec[i] - left_hand_cur_pos_vec[i]) + kd_hand * (left_hand_des_vel_vec[i] - left_hand_cur_vel_vec[i]);
+        right_hand_des_trq_vec[i] = kp_hand * (right_hand_des_pos_vec[i] - right_hand_cur_pos_vec[i]) + kd_hand * (right_hand_des_vel_vec[i] - right_hand_cur_vel_vec[i]);
+      
+      }  
     }
   
-    // for(double &pos: joint_message.position){
-    //   pos = target_position;
-    // }
-
-    // for(double &pos: joint_message.velocity){
-    //   pos = target_velocity;
-    // }
-
     // Compute Jacobian for left and right arms
     computeJacobian();
 
@@ -368,32 +364,91 @@ class AlexRobot : public rclcpp::Node{
 
   }
 
+  // Function to compute the numerical Jacobian matrices for both arms
+  void computeNumericalJacobian(Eigen::MatrixXd& jacobian_matrix, KDL::ChainFkSolverPos_recursive& fk_solver, Eigen::VectorXd& joint_pos_vec, Eigen::VectorXd& end_eff_pose_vec, KDL::Chain& chain) {
+
+    const double eps = 1e-6;  // Small perturbation
+    int num_joints = chain.getNrOfJoints();
+    KDL::JntArray joint_positions(num_joints);
+
+    // Initialize joint positions
+    for (int i = 0; i < num_joints; ++i) {
+        joint_positions(i) = joint_pos_vec[i];
+    }
+
+    // Loop over each joint and calculate partial derivatives
+    for (int j = 0; j < num_joints; ++j) {
+
+        // Store original joint position
+        double original_position = joint_positions(j);
+
+        // Perturb positively
+        joint_positions(j) = original_position + eps;
+        KDL::Frame perturbed_pose_plus;
+        fk_solver.JntToCart(joint_positions, perturbed_pose_plus);
+
+        // Perturb negatively
+        joint_positions(j) = original_position - eps;
+        KDL::Frame perturbed_pose_minus;
+        fk_solver.JntToCart(joint_positions, perturbed_pose_minus);
+
+        // Reset joint position
+        joint_positions(j) = original_position;
+
+        // Compute numerical derivative for each component of the pose
+        for (int i = 0; i < 3; ++i) {  // Position (x, y, z)
+            jacobian_matrix(i, j) = (perturbed_pose_plus.p[i] - perturbed_pose_minus.p[i]) / (2 * eps);
+        }
+
+        // Extract orientation as RPY and compute numerical derivative for each component
+        double roll_plus, pitch_plus, yaw_plus;
+        perturbed_pose_plus.M.GetRPY(roll_plus, pitch_plus, yaw_plus);
+
+        double roll_minus, pitch_minus, yaw_minus;
+        perturbed_pose_minus.M.GetRPY(roll_minus, pitch_minus, yaw_minus);
+
+        jacobian_matrix(3, j) = (roll_plus - roll_minus) / (2 * eps);
+        jacobian_matrix(4, j) = (pitch_plus - pitch_minus) / (2 * eps);
+        jacobian_matrix(5, j) = (yaw_plus - yaw_minus) / (2 * eps);
+    }
+  }
+
   // Function to compute Jacobian matrices for both arms
   void computeJacobian() {
+    
+    if (jacobian_calculation_method == 1){
+      // Call the KDL Jacobian function for both arms
+      KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
+      KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
 
-    KDL::JntArray left_arm_joint_positions(left_arm_chain.getNrOfJoints());
-    KDL::JntArray right_arm_joint_positions(right_arm_chain.getNrOfJoints());
-
-    for (int i = 0; i < int(left_arm_joint_positions.rows()); ++i) {
+      for (int i = 0; i < int(left_arm_joint_positions.rows()); ++i) {
         left_arm_joint_positions(i) = left_arm_cur_pos_vec[i];
         right_arm_joint_positions(i) = right_arm_cur_pos_vec[i];
-    }
-
-    KDL::Jacobian left_arm_jacobian(left_arm_chain.getNrOfJoints());
-    KDL::Jacobian right_arm_jacobian(right_arm_chain.getNrOfJoints());
-
-    left_arm_jacobian_solver->JntToJac(left_arm_joint_positions, left_arm_jacobian);
-    right_arm_jacobian_solver->JntToJac(right_arm_joint_positions, right_arm_jacobian);
-
-    for (int i = 0; i < int(left_arm_des_pos_vec.size() - 1); i++){
-      for (int j = 0; j < int(left_arm_des_pos_vec.size()); j++){
-        
-        left_arm_jacobian_matrix(i , j) = left_arm_jacobian.data(i, j);
-        right_arm_jacobian_matrix(i , j) = right_arm_jacobian.data(i, j);
       }
-    }
 
+      KDL::Jacobian left_arm_jacobian(left_arm_chain.getNrOfJoints());
+      KDL::Jacobian right_arm_jacobian(right_arm_chain.getNrOfJoints());
+
+      left_arm_jacobian_solver->JntToJac(left_arm_joint_positions, left_arm_jacobian);
+      right_arm_jacobian_solver->JntToJac(right_arm_joint_positions, right_arm_jacobian);
+
+      for (int i = 0; i < int(left_arm_des_pos_vec.size() - 1); i++){
+        for (int j = 0; j < int(left_arm_des_pos_vec.size()); j++){
+        
+          left_arm_jacobian_matrix(i , j) = left_arm_jacobian.data(i, j);
+          right_arm_jacobian_matrix(i , j) = right_arm_jacobian.data(i, j);
+        }
+      }
+    } else if (jacobian_calculation_method == 2){
+
+      // Call the numerical Jacobian function for both arms
+      // Left arm numerical Jacobian
+      computeNumericalJacobian(left_arm_jacobian_matrix, *left_arm_fk_solver, left_arm_cur_pos_vec, left_arm_cur_end_eff_pose_vec, left_arm_chain);
+
+      // Right arm numerical Jacobian
+      computeNumericalJacobian(right_arm_jacobian_matrix, *right_arm_fk_solver, right_arm_cur_pos_vec, right_arm_cur_end_eff_pose_vec, right_arm_chain);
     }
+  }
 
   // Function to compute forward kinematics for both arms
   void computeForwardKinematics() {
@@ -414,34 +469,14 @@ class AlexRobot : public rclcpp::Node{
     // Compute forward kinematics for left and right arms
     if (left_arm_fk_solver->JntToCart(left_arm_joint_positions, left_arm_ee_frame) >= 0) {
 
-        // std::cout << std::endl << "Left Arm End-Effector Position: "
-        //           << "X: " << left_arm_ee_frame.p.x() << ", "
-        //           << "Y: " << left_arm_ee_frame.p.y() << ", "
-        //           << "Z: " << left_arm_ee_frame.p.z() << std::endl;
-
-        // Extract orientation as Euler angles (roll, pitch, yaw)
         left_arm_ee_frame.M.GetRPY(left_arm_roll, left_arm_pitch, left_arm_yaw);
-        // std::cout << "Left Arm End-Effector Orientation (RPY): "
-        //           << "Roll: " << left_arm_roll << ", "
-        //           << "Pitch: " << left_arm_pitch << ", "
-        //           << "Yaw: " << left_arm_yaw << std::endl;
     } else {
 
         RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for left arm.");
     }
     if (right_arm_fk_solver->JntToCart(right_arm_joint_positions, right_arm_ee_frame) >= 0) {
 
-        // std::cout << std::endl << "Right Arm End-Effector Position: "
-        //           << "X: " << right_arm_ee_frame.p.x() << ", "
-        //           << "Y: " << right_arm_ee_frame.p.y() << ", "
-        //           << "Z: " << right_arm_ee_frame.p.z() << std::endl;
-
-        // Extract orientation as Euler angles (roll, pitch, yaw)
         right_arm_ee_frame.M.GetRPY(right_arm_roll, right_arm_pitch, right_arm_yaw);
-        // std::cout << "Right Arm End-Effector Orientation (RPY): "
-        //           << "Roll: " << right_arm_roll << ", "
-        //           << "Pitch: " << right_arm_pitch << ", "
-        //           << "Yaw: " << right_arm_yaw << std::endl;
     } else {
 
         RCLCPP_ERROR(this->get_logger(), "Failed to compute forward kinematics for right arm.");
@@ -462,8 +497,7 @@ class AlexRobot : public rclcpp::Node{
     right_arm_cur_end_eff_pose_vec[3] =  right_arm_roll;
     right_arm_cur_end_eff_pose_vec[4] =  right_arm_pitch;
     right_arm_cur_end_eff_pose_vec[5] =  right_arm_yaw;
-
-    }
+  }
 
   void printRobotData(){
 
@@ -492,7 +526,7 @@ class AlexRobot : public rclcpp::Node{
 
   double kp_arm_joint_space, kd_arm_joint_space, kp_hand, kd_hand; 
   double frequency, time, amplitude, target_position, target_velocity;
-  double control_mode;
+  double control_mode, jacobian_calculation_method;
 
   double left_arm_roll, left_arm_pitch, left_arm_yaw;
   double right_arm_roll, right_arm_pitch, right_arm_yaw;
