@@ -190,9 +190,9 @@ class AlexRobot : public rclcpp::Node{
     Kp_Matrix_pos = 250; 
     Kd_Matrix_pos = 25;
 
-    // stiffness and damping - end-effector orientation (5, 1)
-    Kp_Matrix_ori = 0;
-    Kd_Matrix_ori = 0;
+    // stiffness and damping - end-effector orientation (1, 0.001)
+    Kp_Matrix_ori = 1;
+    Kd_Matrix_ori = 0.001;
 
     // robot jacobian calculation method (1 or 2)
     // 1 -> jacobian calculation: KDL
