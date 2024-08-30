@@ -178,21 +178,21 @@ class AlexRobot : public rclcpp::Node{
     kp_hand = 0.125;
     kd_hand = 0.00125;
 
-    frequency = 0.1;
+    frequency = 0.05;
     amplitude = 0.05;
 
     // robot control mode (1 or 2)
     // 1 -> joint-space control mode
     // 2 -> task-space control mode
-    control_mode = 2;
+    control_mode = 1;
 
     // stiffness and damping - end-effector position
     Kp_Matrix_pos = 250; 
     Kd_Matrix_pos = 25;
 
     // stiffness and damping - end-effector orientation (5, 1)
-    Kp_Matrix_ori = 3;
-    Kd_Matrix_ori = 1;
+    Kp_Matrix_ori = 0;
+    Kd_Matrix_ori = 0;
 
     // robot jacobian calculation method (1 or 2)
     // 1 -> jacobian calculation: KDL
@@ -305,7 +305,7 @@ class AlexRobot : public rclcpp::Node{
     }
 
     if (trajectory_tracking_activation == 1){
-      if (time >= 15){
+      if (time >= 30){
         target_position_sin = amplitude * sin(M_PI * frequency * time);
         target_velocity_cos = M_PI * cos(2 * M_PI * frequency * time);
 
@@ -313,10 +313,10 @@ class AlexRobot : public rclcpp::Node{
         target_velocity_sin = -M_PI * sin(2 * M_PI * frequency * time);
 
         // left arm end-effector desired pose
-        left_arm_des_end_eff_pose_vec << 0.30, 0.50, 0.50 + target_position_sin, -2.5 * M_PI/180, -65 * M_PI/180, 15 * M_PI/180;
+        left_arm_des_end_eff_pose_vec << 0.25, 0.35, 0.30 + target_position_sin, -0.0 * M_PI/180, -90 * M_PI/180, 0.0 * M_PI/180;
 
         // right arm end-effector desired pose
-        right_arm_des_end_eff_pose_vec << 0.30, -0.50, 0.50 + target_position_cos, 2.5 * M_PI/180, -65 * M_PI/180, -15 * M_PI/180;
+        right_arm_des_end_eff_pose_vec << 0.25, -0.35, 0.30 + target_position_cos, 0.0 * M_PI/180, -90 * M_PI/180, -0.0 * M_PI/180;
 
         left_arm_des_end_eff_vel_vec(2) =  target_velocity_sin;
         right_arm_des_end_eff_vel_vec(2) =  target_velocity_cos;
@@ -325,10 +325,10 @@ class AlexRobot : public rclcpp::Node{
     }
 
     // left arm end-effector desired pose
-    left_arm_des_end_eff_pose_vec << 0.30, 0.50, 0.50, -2.5 * M_PI/180, -65 * M_PI/180, 15 * M_PI/180;
+    left_arm_des_end_eff_pose_vec << 0.25, 0.35, 0.30, -0.0 * M_PI/180, -90 * M_PI/180, 0.0 * M_PI/180;
 
     // right arm end-effector desired pose
-    right_arm_des_end_eff_pose_vec << 0.30, -0.50, 0.50, 2.5 * M_PI/180, -65 * M_PI/180, -15 * M_PI/180;
+    right_arm_des_end_eff_pose_vec << 0.25, -0.35, 0.30, 0.0 * M_PI/180, -90 * M_PI/180, -0.0 * M_PI/180;
 
     // left arm end-effector - pose and velocity error
     left_arm_end_eff_pose_error = left_arm_des_end_eff_pose_vec - left_arm_cur_end_eff_pose_vec;
@@ -337,6 +337,10 @@ class AlexRobot : public rclcpp::Node{
     // right arm end-effector - pose and velocity error
     right_arm_end_eff_pose_error = right_arm_des_end_eff_pose_vec - right_arm_cur_end_eff_pose_vec;
     right_arm_end_eff_vel_error = right_arm_des_end_eff_vel_vec - right_arm_cur_end_eff_vel_vec;
+
+    if (time >= 15){
+      control_mode = 2;
+    }
 
     if (control_mode == 1) {
 
@@ -529,7 +533,7 @@ class AlexRobot : public rclcpp::Node{
 
     std::cout << std::endl << "Time: " << time << std::endl << std::endl;
 
-    std::cout << "Left Arm Jacobian: \n" << left_arm_jacobian_matrix << std::endl;
+    std::cout << "Left Arm Jacobian: \n" << setprecision(5) << left_arm_jacobian_matrix << std::endl;
     std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian_matrix << std::endl;
 
     std::cout << std::endl << "Left  Arm End-Effector Current Pose: " << "\tP.x = " << left_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << left_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << left_arm_cur_end_eff_pose_vec[2] 
