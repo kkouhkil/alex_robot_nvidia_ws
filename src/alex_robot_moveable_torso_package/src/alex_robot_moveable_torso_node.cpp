@@ -10,6 +10,8 @@
 #include <cmath>
 #include <eigen3/Eigen/Eigen>
 
+using namespace std;
+
 // KDL and URDF headers
 #include <urdf/model.h>
 #include <kdl_parser/kdl_parser.hpp>
@@ -78,17 +80,11 @@ public:
                           "Right_middle_q2", "Right_pinky_q2", "Right_ring_q2", "Right_thumb_q2"
                           };*/
 
-    // spine =  joint_message.position[4, 7]
+    // neck =  joint_message.position[4, 7]
     neck_des_pos_vec = Eigen::VectorXd(2);
     neck_cur_pos_vec = Eigen::VectorXd(2);
 
     neck_des_pos_vec << 0 * M_PI/180, 0 * M_PI/180;
-
-    // spine =  joint_message.position[0, 1, 2]
-    spine_des_pos_vec = Eigen::VectorXd(3);
-    spine_cur_pos_vec = Eigen::VectorXd(3);
-
-    spine_des_pos_vec << 0 * M_PI/180, 0 * M_PI/180, 0 * M_PI/180;
 
     // left_arm  =  joint_message.position[3, 6, 9, 11, 13, 15, 17]
     left_arm_des_pos_vec  = Eigen::VectorXd(7);
@@ -107,6 +103,12 @@ public:
     right_arm_des_trq_vec = Eigen::VectorXd(7);
 
     right_arm_des_pos_vec << -30 * M_PI/180, -75 * M_PI/180, 0.0, -60 * M_PI/180, -45 * M_PI/180, 0.0, 0.0;
+
+    // spine =  joint_message.position[0, 1, 2]
+    spine_des_pos_vec = Eigen::VectorXd(3);
+    spine_cur_pos_vec = Eigen::VectorXd(3);
+
+    spine_des_pos_vec << 0 * M_PI/180, 0 * M_PI/180, 0 * M_PI/180;
 
     // left_arm - end-effector - position - desired and current
     left_arm_des_end_eff_pose_vec = Eigen::VectorXd(6); 
@@ -130,9 +132,6 @@ public:
 
     // neck - variable values initialisation
     neck_cur_pos_vec.setZero();
-
-    // spine - variable values initialisation
-    spine_cur_pos_vec.setZero();
 
     // left_arm - variable values initialisation
     left_arm_des_vel_vec.setZero();
@@ -161,6 +160,9 @@ public:
     right_arm_cur_end_eff_vel_vec.setZero();
 
     right_hand_des_trq_vec.setZero();
+
+    // spine - variable values initialisation
+    spine_cur_pos_vec.setZero();
   }
 
   // Publisher callback
@@ -170,10 +172,19 @@ public:
     std::chrono::duration<double> elapsed = now - start_time;
     time = elapsed.count(); // time in seconds
 
+    // Printing Robot Data
+    printRobotData();
+
+    // Publishing joint messages
+    alex_pub->publish(joint_message);
   }
 
   // Subscriber callback
   void jointStateSubCallback(const sensor_msgs::msg::JointState::SharedPtr msg){
+
+    // neck =  joint_message.position[4, 7]
+    neck_cur_pos_vec[0] = msg->position[4];
+    neck_cur_pos_vec[1] = msg->position[7];
 
     // left_arm  =  joint_message.position[3, 6, 9, 11, 13, 15, 17]
     left_arm_cur_pos_vec[0] = msg->position[3];
@@ -193,32 +204,24 @@ public:
     right_arm_cur_pos_vec[5] = msg->position[16];
     right_arm_cur_pos_vec[6] = msg->position[18];
 
+    // spine =  joint_message.position[0, 1, 2]
+    spine_cur_pos_vec[0] = msg->position[0];
+    spine_cur_pos_vec[1] = msg->position[1];
+    spine_cur_pos_vec[2] = msg->position[2];
+
   }
 
   void printRobotData(){
 
-    std::cout << std::endl << "Time: " << time << std::endl << std::endl;
+    std::cout << std::endl << "Time: " << time << std::endl;
 
-    // std::cout << "Left Arm Jacobian: \n" << setprecision(5) << left_arm_jacobian_matrix << std::endl;
-    // std::cout << "\nRight Arm Jacobian: \n" << right_arm_jacobian_matrix << std::endl;
+    std::cout << std::endl << "Neck Current Joint Poisiton: " << neck_cur_pos_vec.transpose() << std::endl; 
 
-    // std::cout << std::endl << "Left  Arm End-Effector Current Pose: " << "\tP.x = " << left_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << left_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << left_arm_cur_end_eff_pose_vec[2] 
-    //                                                          << "\tO.x = " << left_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << left_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << left_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
+    std::cout << std::endl << "Left Arm Current Joint Poisiton: " << left_arm_cur_pos_vec.transpose() << std::endl;
 
-    // std::cout << "Right Arm End-Effector Current Pose: " << "\tP.x = " << right_arm_cur_end_eff_pose_vec[0] << "\tP.y = " << right_arm_cur_end_eff_pose_vec[1] << "\tP.z = " << right_arm_cur_end_eff_pose_vec[2] 
-    //                                              << "\tO.x = " << right_arm_cur_end_eff_pose_vec[3] * 180/M_PI << "\tO.y = " << right_arm_cur_end_eff_pose_vec[4] * 180/M_PI << "\tO.z = " << right_arm_cur_end_eff_pose_vec[5] * 180/M_PI << std::endl;
+    std::cout << std::endl << "Right Arm Current Joint Poisiton: " << right_arm_cur_pos_vec.transpose() << std::endl;
 
-    // std::cout << std::endl << "Left  Arm End-effector Pose error: " << "\teP.x = " << left_arm_end_eff_pose_error[0] << "\teP.y = " << left_arm_end_eff_pose_error[1] << "\teP.z = " << left_arm_end_eff_pose_error[2] 
-    //                                                          << "\teO.x = " << left_arm_end_eff_pose_error[3] * 180/M_PI << "\teO.y = " << left_arm_end_eff_pose_error[4] * 180/M_PI << "\teO.z = " << left_arm_end_eff_pose_error[5] * 180/M_PI << std::endl;
-
-    // std::cout << "Right Arm End-effector Pose error: " << "\teP.x = " << right_arm_end_eff_pose_error[0] << "\teP.y = " << right_arm_end_eff_pose_error[1] << "\teP.z = " << right_arm_end_eff_pose_error[2] 
-    //                                              << "\teO.x = " << right_arm_end_eff_pose_error[3] * 180/M_PI << "\teO.y = " << right_arm_end_eff_pose_error[4] * 180/M_PI << "\teO.z = " << right_arm_end_eff_pose_error[5] * 180/M_PI << std::endl;
-
-    // std::cout << std::endl << "Left  Arm End-Effector Current Velocity: " << left_arm_cur_end_eff_vel_vec.transpose() << std::endl;
-    // std::cout << "Right Arm End-Effector Current Velocity: " << right_arm_cur_end_eff_vel_vec.transpose() << std::endl;
-
-    // std::cout << std::endl << "Left  Arm Joint Torques:  = " << left_arm_des_trq_vec.transpose() << std::endl;
-    // std::cout << "Right Arm Joint Torques: = " << right_arm_des_trq_vec.transpose() << std::endl;
+    std::cout << std::endl << "Spine Current Joint Poisiton: " << spine_cur_pos_vec.transpose() << std::endl;
   }
 
 private:
