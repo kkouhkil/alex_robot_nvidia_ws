@@ -29,6 +29,12 @@ public:
 
     start_time = std::chrono::steady_clock::now();
 
+    // Robot Model:
+    // Model = 1 --> Alex Robot - Nub Hands
+    // Model = 2 --> Alex Robot - Sake Hands
+    // Model = 3 --> Alex Robot - Psyonic Hands
+    robot_model = 1;
+
     // Publisher for joint_states
     alex_pub = this -> create_publisher<sensor_msgs::msg::JointState>( "joint_command", 10);
     timer_ = this -> create_wall_timer(std::chrono::milliseconds(20),
@@ -40,45 +46,84 @@ public:
 
     joint_message = sensor_msgs::msg::JointState();
 
-    // <-- Alex Robot - Nub Hands -->
-    joint_message.name = {"SpineYaw", "SpineRoll", "SpinePitch", "LeftShoulderPitch", "NeckYaw", "RightShoulderPitch", "LeftShoulderRoll", 
-                          "NeckPitch", "RightShoulderRoll", "LeftShoulderYaw", "RightShoulderYaw", "LeftElbowPitch", "RightElbowPitch", "LeftWristYaw", 
-                          "RightWristYaw", "LeftWristRoll", "RightWristRoll", "LeftGripperYaw", "RightGripperYaw"
-                          };
+    if (robot_model == 1){
 
-    // joint-message - Position
-    joint_message.position = {0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 
-                              0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180,
-                              0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180
-                              };
+      // <-- Alex Robot - Nub Hands -->
+      joint_message.name = {"SpineYaw", "SpineRoll", "SpinePitch", "LeftShoulderPitch", "NeckYaw", "RightShoulderPitch", "LeftShoulderRoll", 
+                            "NeckPitch", "RightShoulderRoll", "LeftShoulderYaw", "RightShoulderYaw", "LeftElbowPitch", "RightElbowPitch", "LeftWristYaw", 
+                            "RightWristYaw", "LeftWristRoll", "RightWristRoll", "LeftGripperYaw", "RightGripperYaw"
+                            };
 
-    // joint-message - Velocity
-    joint_message.velocity = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
+      // joint-message - Position
+      joint_message.position = {0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 
+                                0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180,
+                                0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180, 0.0 * M_PI/180
+                                };
+
+      // joint-message - Velocity
+      joint_message.velocity = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0, 0.0, 0.0
+                                };
+
+      // joint-message - Effort
+      joint_message.effort = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
                               0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                               0.0, 0.0, 0.0, 0.0, 0.0
                               };
 
-    // joint-message - Effort
-    joint_message.effort = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
-                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                            0.0, 0.0, 0.0, 0.0, 0.0
+    }else if (robot_model == 2){
+
+      // <-- Alex Robot - Sake Hands -->
+      joint_message.name = {"SpineYaw", "SpineRoll", "SpinePitch", "LeftShoulderPitch", "NeckYaw", "RightShoulderPitch", "LeftShoulderRoll", 
+                              "NeckPitch", "RightShoulderRoll", "LeftShoulderYaw", "RightShoulderYaw", "LeftElbowPitch", "RightElbowPitch", "LeftWristYaw", 
+                              "RightWristYaw", "LeftWristRoll", "RightWristRoll", "LeftGripperYaw", "RightGripperYaw", "Left_GRIPPER_X1", "Left_GRIPPER_X2", 
+                              "Right_GRIPPER_X1", "Right_GRIPPER_X2"
                             };
 
-    // <-- Alex Robot - Sake Hands -->
-    /*joint_message.name = {"SpineYaw", "SpineRoll", "SpinePitch", "LeftShoulderPitch", "NeckYaw", "RightShoulderPitch", "LeftShoulderRoll", 
-                          "NeckPitch", "RightShoulderRoll", "LeftShoulderYaw", "RightShoulderYaw", "LeftElbowPitch", "RightElbowPitch", "LeftWristYaw", 
-                          "RightWristYaw", "LeftWristRoll", "RightWristRoll", "LeftGripperYaw", "RightGripperYaw", "Left_GRIPPER_X1", "Left_GRIPPER_X2", 
-                          "Right_GRIPPER_X1", "Right_GRIPPER_X2"
-                          };*/
- 
-     // <-- Alex Robot - Psyonic Hands -->
-    /*joint_message.name = {"SpineYaw", "SpineRoll", "SpinePitch", "LeftShoulderPitch", "NeckYaw", "RightShoulderPitch", "LeftShoulderRoll", 
-                          "NeckPitch", "RightShoulderRoll", "LeftShoulderYaw", "RightShoulderYaw", "LeftElbowPitch", "RightElbowPitch", "LeftWristYaw", 
-                          "RightWristYaw", "LeftWristRoll", "RightWristRoll", "LeftGripperYaw", "RightGripperYaw", "Left_index_q1", "Left_middle_q1", 
-                          "Left_pinky_q1", "Left_ring_q1", "Left_thumb_q1", "Right_index_q1", "Right_middle_q1", "Right_pinky_q1", "Right_ring_q1", 
-                          "Right_thumb_q1", "Left_index_q2", "Left_middle_q2", "Left_pinky_q2", "Left_ring_q2", "Left_thumb_q2", "Right_index_q2", 
-                          "Right_middle_q2", "Right_pinky_q2", "Right_ring_q2", "Right_thumb_q2"
-                          };*/
+      // joint-message - Velocity
+      joint_message.velocity = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                0.0, 0.0
+                                };
+
+      // joint-message - Effort
+      joint_message.effort = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              0.0, 0.0
+                              };
+
+    } else if (robot_model == 3){
+      
+      // <-- Alex Robot - Psyonic Hands -->
+      joint_message.name = {"SpineYaw", "SpineRoll", "SpinePitch", "LeftShoulderPitch", "NeckYaw", "RightShoulderPitch", "LeftShoulderRoll", 
+                              "NeckPitch", "RightShoulderRoll", "LeftShoulderYaw", "RightShoulderYaw", "LeftElbowPitch", "RightElbowPitch", "LeftWristYaw", 
+                              "RightWristYaw", "LeftWristRoll", "RightWristRoll", "LeftGripperYaw", "RightGripperYaw", "Left_index_q1", "Left_middle_q1", 
+                              "Left_pinky_q1", "Left_ring_q1", "Left_thumb_q1", "Right_index_q1", "Right_middle_q1", "Right_pinky_q1", "Right_ring_q1", 
+                              "Right_thumb_q1", "Left_index_q2", "Left_middle_q2", "Left_pinky_q2", "Left_ring_q2", "Left_thumb_q2", "Right_index_q2", 
+                              "Right_middle_q2", "Right_pinky_q2", "Right_ring_q2", "Right_thumb_q2"
+                            };
+
+      // joint-message - Velocity
+      joint_message.velocity = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                0.0, 0.0, 0.0, 0.0
+                                };
+
+      // joint-message - Effort
+      joint_message.effort = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                              0.0, 0.0, 0.0, 0.0
+                              };
+    }
 
     // neck =  joint_message.position[4, 7]
     neck_des_pos_vec = Eigen::VectorXd(2);
