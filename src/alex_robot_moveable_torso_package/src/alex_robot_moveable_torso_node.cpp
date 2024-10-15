@@ -128,6 +128,9 @@ public:
     // neck =  joint_message.position[4, 7]
     neck_des_pos_vec = Eigen::VectorXd(2);
     neck_cur_pos_vec = Eigen::VectorXd(2);
+    neck_des_vel_vec = Eigen::VectorXd(2);
+    neck_cur_vel_vec = Eigen::VectorXd(2);
+    neck_des_trq_vec  = Eigen::VectorXd(2);
 
     neck_des_pos_vec << 0 * M_PI/180, 0 * M_PI/180;
 
@@ -152,6 +155,9 @@ public:
     // spine =  joint_message.position[0, 1, 2]
     spine_des_pos_vec = Eigen::VectorXd(3);
     spine_cur_pos_vec = Eigen::VectorXd(3);
+    spine_des_vel_vec = Eigen::VectorXd(3);
+    spine_cur_vel_vec = Eigen::VectorXd(3);
+    spine_des_trq_vec  = Eigen::VectorXd(3);
 
     spine_des_pos_vec << 0 * M_PI/180, 0 * M_PI/180, 0 * M_PI/180;
 
@@ -177,6 +183,10 @@ public:
 
     // neck - variable values initialisation
     neck_cur_pos_vec.setZero();
+    neck_des_vel_vec.setZero();
+    neck_cur_vel_vec.setZero();
+
+    neck_des_trq_vec.setZero(); 
 
     // left_arm - variable values initialisation
     left_arm_des_vel_vec.setZero();
@@ -208,6 +218,22 @@ public:
 
     // spine - variable values initialisation
     spine_cur_pos_vec.setZero();
+    spine_des_vel_vec.setZero();
+    spine_cur_vel_vec.setZero();
+
+    spine_des_trq_vec.setZero(); 
+
+    // controller PD gains - robot arms
+    kp_neck_joint_space = 25;
+    kd_neck_joint_space = 1;
+
+    // controller PD gains - robot arms
+    kp_arm_joint_space = 25;
+    kd_arm_joint_space = 1;
+
+    // controller PD gains - spine
+    kp_spine_joint_space = 100;
+    kd_spine_joint_space = 10;
   }
 
   // Publisher callback
@@ -216,6 +242,89 @@ public:
     auto now = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed = now - start_time;
     time = elapsed.count(); // time in seconds
+
+    // neck =  joint_message[4, 7]
+    joint_message.position[4] = neck_des_pos_vec[0];
+    joint_message.position[7] = neck_des_pos_vec[1];
+
+    joint_message.velocity[4] = neck_des_vel_vec[0];
+    joint_message.velocity[7] = neck_des_vel_vec[1];
+
+    joint_message.effort[4] = neck_des_trq_vec[0];
+    joint_message.effort[7] = neck_des_trq_vec[1];
+
+    // left_arm  =  joint_message[3, 6, 9, 11, 13, 15, 17]
+    joint_message.position[3] = left_arm_des_pos_vec[0];
+    joint_message.position[6] = left_arm_des_pos_vec[1];
+    joint_message.position[9] = left_arm_des_pos_vec[2];
+    joint_message.position[11] = left_arm_des_pos_vec[3];
+    joint_message.position[13] = left_arm_des_pos_vec[4];
+    joint_message.position[15] = left_arm_des_pos_vec[5];
+    joint_message.position[17] = left_arm_des_pos_vec[6];
+
+    joint_message.velocity[3] = left_arm_des_vel_vec[0];
+    joint_message.velocity[6] = left_arm_des_vel_vec[1];
+    joint_message.velocity[9] = left_arm_des_vel_vec[2];
+    joint_message.velocity[11] = left_arm_des_vel_vec[3];
+    joint_message.velocity[13] = left_arm_des_vel_vec[4];
+    joint_message.velocity[15] = left_arm_des_vel_vec[5];
+    joint_message.velocity[17] = left_arm_des_vel_vec[6];
+
+    joint_message.effort[3] = left_arm_des_trq_vec[0];
+    joint_message.effort[6] = left_arm_des_trq_vec[1];
+    joint_message.effort[9] = left_arm_des_trq_vec[2];
+    joint_message.effort[11] = left_arm_des_trq_vec[3];
+    joint_message.effort[13] = left_arm_des_trq_vec[4];
+    joint_message.effort[15] = left_arm_des_trq_vec[5];
+    joint_message.effort[17] = left_arm_des_trq_vec[6];
+
+    // right_arm =  joint_message[5, 8, 10, 12, 14, 16, 18]
+    joint_message.position[5] = right_arm_des_pos_vec[0];
+    joint_message.position[8] = right_arm_des_pos_vec[1];
+    joint_message.position[10] = right_arm_des_pos_vec[2];
+    joint_message.position[12] = right_arm_des_pos_vec[3];
+    joint_message.position[14] = right_arm_des_pos_vec[4];
+    joint_message.position[15] = right_arm_des_pos_vec[5];
+    joint_message.position[18] = right_arm_des_pos_vec[6];
+
+    joint_message.velocity[5] = right_arm_des_vel_vec[0];
+    joint_message.velocity[8] = right_arm_des_vel_vec[1];
+    joint_message.velocity[10] = right_arm_des_vel_vec[2];
+    joint_message.velocity[12] = right_arm_des_vel_vec[3];
+    joint_message.velocity[14] = right_arm_des_vel_vec[4];
+    joint_message.velocity[15] = right_arm_des_vel_vec[5];
+    joint_message.velocity[18] = right_arm_des_vel_vec[6];
+
+    joint_message.effort[5] = right_arm_des_trq_vec[0];
+    joint_message.effort[8] = right_arm_des_trq_vec[1];
+    joint_message.effort[10] = right_arm_des_trq_vec[2];
+    joint_message.effort[12] = right_arm_des_trq_vec[3];
+    joint_message.effort[14] = right_arm_des_trq_vec[4];
+    joint_message.effort[15] = right_arm_des_trq_vec[5];
+    joint_message.effort[18] = right_arm_des_trq_vec[6];
+
+    // spine =  joint_message[0, 1, 2]
+    joint_message.position[0] = spine_des_pos_vec[0];
+    joint_message.position[1] = spine_des_pos_vec[1];
+    joint_message.position[2] = spine_des_pos_vec[2];
+
+    joint_message.velocity[0] = spine_des_vel_vec[0];
+    joint_message.velocity[1] = spine_des_vel_vec[1];
+    joint_message.velocity[2] = spine_des_vel_vec[2];
+
+    joint_message.effort[0] = spine_des_trq_vec[0];
+    joint_message.effort[1] = spine_des_trq_vec[1];
+    joint_message.effort[2] = spine_des_trq_vec[2];
+
+    // Joint-Space control - neck
+    neck_des_trq_vec = kp_neck_joint_space * (neck_des_pos_vec - neck_cur_pos_vec) + kd_neck_joint_space * (neck_des_vel_vec - neck_cur_vel_vec);
+
+    // Joint-Space control - robot arms
+    left_arm_des_trq_vec = kp_arm_joint_space * (left_arm_des_pos_vec - left_arm_cur_pos_vec) + kd_arm_joint_space * (left_arm_des_vel_vec - left_arm_cur_vel_vec);
+    right_arm_des_trq_vec = kp_arm_joint_space * (right_arm_des_pos_vec - right_arm_cur_pos_vec) + kd_arm_joint_space * (right_arm_des_vel_vec - right_arm_cur_vel_vec);
+
+    // Joint-Space control - spine
+    spine_des_trq_vec = kp_spine_joint_space * (spine_des_pos_vec - spine_cur_pos_vec) + kd_spine_joint_space * (spine_des_vel_vec - spine_cur_vel_vec);
 
     // Printing Robot Data
     printRobotData();
@@ -272,7 +381,7 @@ public:
 private:
 
   int robot_model;
-  double kp_arm_joint_space, kd_arm_joint_space, kp_hand, kd_hand, Kp_Matrix_pos, Kp_Matrix_ori, Kd_Matrix_pos, Kd_Matrix_ori; 
+  double kp_neck_joint_space, kd_neck_joint_space, kp_arm_joint_space, kd_arm_joint_space, kp_spine_joint_space, kd_spine_joint_space, Kp_Matrix_pos, Kp_Matrix_ori, Kd_Matrix_pos, Kd_Matrix_ori; 
   double frequency, time, amplitude, target_position_sin, target_velocity_cos, target_position_cos, target_velocity_sin, trajectory_tracking_activation;
   double control_mode, jacobian_calculation_method;
 
@@ -289,9 +398,15 @@ private:
 
   Eigen::VectorXd spine_des_pos_vec;
   Eigen::VectorXd spine_cur_pos_vec;
+  Eigen::VectorXd spine_des_vel_vec;
+  Eigen::VectorXd spine_cur_vel_vec;
+  Eigen::VectorXd spine_des_trq_vec;
 
   Eigen::VectorXd neck_des_pos_vec;
   Eigen::VectorXd neck_cur_pos_vec;
+  Eigen::VectorXd neck_des_vel_vec;
+  Eigen::VectorXd neck_cur_vel_vec;
+  Eigen::VectorXd neck_des_trq_vec;
   
   Eigen::VectorXd left_arm_des_pos_vec;
   Eigen::VectorXd left_arm_des_vel_vec;
